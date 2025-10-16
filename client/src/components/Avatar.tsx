@@ -6,6 +6,7 @@ interface AvatarProps {
   initials?: string
   size?: 'sm' | 'md' | 'lg' | 'xl'
   className?: string
+  loading?: 'lazy' | 'eager'
 }
 
 const sizeClasses = {
@@ -15,7 +16,7 @@ const sizeClasses = {
   xl: 'w-24 h-24 text-3xl'
 }
 
-export default function Avatar({ src, alt, initials, size = 'md', className }: AvatarProps) {
+export default function Avatar({ src, alt, initials, size = 'md', className, loading = 'lazy' }: AvatarProps) {
   return (
     <div className={cn(
       "relative rounded-full overflow-hidden bg-gradient-to-br from-[#6366f1] to-[#8b5cf6] flex items-center justify-center text-white font-semibold",
@@ -27,6 +28,7 @@ export default function Avatar({ src, alt, initials, size = 'md', className }: A
           src={src} 
           alt={alt || 'Avatar'} 
           className="w-full h-full object-cover"
+          loading={loading}
         />
       ) : initials ? (
         <span>{initials}</span>

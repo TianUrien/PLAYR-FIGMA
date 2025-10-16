@@ -67,9 +67,11 @@ export default function Landing() {
       {/* Background Image with Overlay */}
       <div className="absolute inset-0">
         <img 
-          src="/Background Image.jpeg"
+          src="/hero-desktop.webp"
           alt="Field Hockey"
           className="w-full h-full object-cover"
+          fetchPriority="high"
+          loading="eager"
         />
         <div className="absolute inset-0 bg-gradient-to-b from-black/70 via-black/60 to-black/80" />
       </div>
@@ -83,6 +85,8 @@ export default function Landing() {
               src="/PLAYR logo White.png" 
               alt="PLAYR" 
               className="h-24 md:h-32 mb-6 object-contain object-left"
+              fetchPriority="high"
+              loading="eager"
             />
             <h2 className="text-4xl md:text-5xl font-bold text-white mb-8">
               Built for Field Hockey.

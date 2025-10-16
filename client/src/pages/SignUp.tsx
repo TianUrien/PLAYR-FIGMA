@@ -109,9 +109,10 @@ export default function SignUp() {
     <div className="min-h-screen relative overflow-hidden flex items-center justify-center p-4">
       <div className="absolute inset-0">
         <img 
-          src="/Background Image.jpeg"
+          src="/hero-desktop.webp"
           alt="Field Hockey"
           className="w-full h-full object-cover"
+          loading="lazy"
         />
         <div className="absolute inset-0 bg-black/70" />
       </div>
