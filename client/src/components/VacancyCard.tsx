@@ -127,7 +127,7 @@ export default function VacancyCard({
         <span className={`px-3 py-1 rounded-full text-xs font-medium ${
           vacancy.opportunity_type === 'player' ? 'bg-blue-100 text-blue-700' : 'bg-green-100 text-green-700'
         }`}>
-          {vacancy.opportunity_type === 'player' ? '⚽ Player' : '👔 Coach'}
+          {vacancy.opportunity_type === 'player' ? 'Player' : 'Coach'}
         </span>
         <span className={`px-3 py-1 rounded-full text-xs font-medium ${
           vacancy.gender === 'Men' ? 'bg-blue-50 text-blue-700' : 'bg-pink-50 text-pink-700'

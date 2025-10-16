@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { MapPin, Globe, Calendar, Plus, Eye, MessageCircle } from 'lucide-react'
+import { MapPin, Globe, Calendar, Plus, Eye, MessageCircle, Edit } from 'lucide-react'
 import { useAuthStore } from '@/lib/auth'
 import { Avatar, EditProfileModal } from '@/components'
 import Header from '@/components/Header'
@@ -129,14 +129,17 @@ export default function ClubDashboard({ profileData, readOnly = false }: ClubDas
                     </button>
                   </div>
                 ) : (
-                  <button className="inline-flex items-center gap-2 px-4 py-2 bg-gradient-to-r from-[#6366f1] to-[#8b5cf6] text-white rounded-lg hover:opacity-90 transition-opacity text-sm font-medium">
-                    <Plus className="w-4 h-4" />
-                    Create Vacancy
+                  <button 
+                    onClick={() => setShowEditModal(true)}
+                    className="inline-flex items-center gap-2 px-4 py-2 bg-gradient-to-r from-[#6366f1] to-[#8b5cf6] text-white rounded-lg hover:opacity-90 transition-opacity text-sm font-medium"
+                  >
+                    <Edit className="w-4 h-4" />
+                    Edit Profile
                   </button>
                 )}
               </div>
 
-              <div className="flex flex-wrap items-center gap-4 text-gray-600">
+              <div className="flex flex-wrap items-center gap-4 text-gray-600 mb-4">
                 <div className="flex items-center gap-2">
                   <Globe className="w-5 h-5" />
                   <span className="font-medium">{profile.nationality}</span>
@@ -153,7 +156,7 @@ export default function ClubDashboard({ profileData, readOnly = false }: ClubDas
                 )}
               </div>
 
-              <div className="mt-4 inline-flex items-center gap-2 px-3 py-1 bg-purple-50 text-purple-700 rounded-full text-sm font-medium">
+              <div className="inline-flex items-center gap-2 px-3 py-1 bg-purple-50 text-purple-700 rounded-full text-sm font-medium">
                 <span className="w-2 h-2 bg-purple-500 rounded-full" />
                 Club
               </div>
