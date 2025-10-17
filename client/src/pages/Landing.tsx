@@ -73,58 +73,69 @@ export default function Landing() {
           fetchPriority="high"
           loading="eager"
         />
-        <div className="absolute inset-0 bg-gradient-to-b from-black/70 via-black/60 to-black/80" />
+        {/* Mobile gradient: lighter for readability */}
+        <div className="absolute inset-0 bg-gradient-to-b from-black/70 to-black/30 lg:from-black/70 lg:via-black/60 lg:to-black/80" />
       </div>
 
       {/* Content */}
-      <div className="relative z-10 min-h-screen flex">
-        {/* Left Side - Hero Content */}
-        <div className="flex-1 flex flex-col justify-center px-8 md:px-16 lg:px-24">
-          <div className="max-w-2xl">
+      <div className="relative z-10 min-h-screen flex flex-col lg:flex-row">
+        {/* Hero Content - Stacked on mobile, left column on desktop */}
+        <div className="flex-1 flex flex-col justify-center px-6 py-12 sm:px-8 md:px-12 lg:px-16 xl:px-24">
+          <div className="max-w-2xl mx-auto lg:mx-0 text-center lg:text-left">
             <img 
               src="/PLAYR logo White.png" 
               alt="PLAYR" 
-              className="h-24 md:h-32 mb-6 object-contain object-left"
+              className="h-16 sm:h-20 lg:h-24 xl:h-32 mb-6 object-contain mx-auto lg:mx-0"
               fetchPriority="high"
               loading="eager"
             />
-            <h2 className="text-4xl md:text-5xl font-bold text-white mb-8">
+            <h1 className="text-3xl sm:text-4xl lg:text-5xl xl:text-6xl font-bold text-white mb-6 lg:mb-8 leading-tight">
               Built for Field Hockey.
-            </h2>
-            <p className="text-xl md:text-2xl text-gray-300 mb-4">
+            </h1>
+            <p className="text-lg sm:text-xl lg:text-2xl text-gray-200 mb-3 lg:mb-4">
               Connect players, coaches, and clubs.
             </p>
-            <p className="text-xl md:text-2xl text-gray-300">
+            <p className="text-lg sm:text-xl lg:text-2xl text-gray-200 mb-8 lg:mb-0">
               Raise the sport together.
             </p>
+
+            {/* Primary CTA - Mobile only */}
+            <div className="lg:hidden mt-8">
+              <button
+                onClick={() => navigate('/signup')}
+                className="w-full sm:w-auto min-h-[44px] px-8 py-3 bg-gradient-to-r from-[#6366f1] to-[#8b5cf6] text-white font-semibold rounded-lg hover:opacity-90 transition-opacity text-base sm:text-lg shadow-lg"
+              >
+                Join PLAYR
+              </button>
+            </div>
           </div>
         </div>
 
-        {/* Right Side - Sign In Card */}
-        <div className="w-full md:w-[500px] flex items-center justify-center p-8">
-          <div className="glass-strong w-full max-w-md rounded-3xl p-8">
-            <h3 className="text-3xl font-bold text-white mb-2">Sign In to PLAYR</h3>
+        {/* Sign In Card - Below content on mobile, right column on desktop */}
+        <div className="w-full lg:w-[500px] flex items-center justify-center px-6 py-8 sm:px-8 lg:p-8">
+          <div className="w-full max-w-md rounded-3xl p-6 sm:p-8 bg-white shadow-xl lg:glass-strong lg:bg-transparent lg:shadow-none">
+            <h3 className="text-2xl sm:text-3xl font-bold text-gray-900 lg:text-white mb-2">Sign In to PLAYR</h3>
             
             <form onSubmit={handleSignIn} className="space-y-4 mt-6">
               <div>
-                <label className="block text-sm font-medium text-white mb-2">Email</label>
+                <label className="block text-sm font-medium text-gray-700 lg:text-white mb-2">Email</label>
                 <Input
                   type="email"
                   value={email}
                   onChange={(e) => setEmail(e.target.value)}
-                  className="bg-white/90"
+                  className="bg-white lg:bg-white/90"
                   required
                 />
               </div>
 
               <div>
-                <label className="block text-sm font-medium text-white mb-2">Password</label>
+                <label className="block text-sm font-medium text-gray-700 lg:text-white mb-2">Password</label>
                 <div className="relative">
                   <Input
                     type={showPassword ? 'text' : 'password'}
                     value={password}
                     onChange={(e) => setPassword(e.target.value)}
-                    className="bg-white/90"
+                    className="bg-white lg:bg-white/90"
                     required
                   />
                   <button
@@ -138,13 +149,13 @@ export default function Landing() {
               </div>
 
               {error && (
-                <p className="text-red-400 text-sm">{error}</p>
+                <p className="text-red-600 lg:text-red-400 text-sm">{error}</p>
               )}
 
               <Button
                 type="submit"
                 variant="primary"
-                className="w-full bg-gradient-to-r from-[#6366f1] to-[#8b5cf6] hover:opacity-90"
+                className="w-full min-h-[44px] bg-gradient-to-r from-[#6366f1] to-[#8b5cf6] hover:opacity-90"
                 disabled={loading}
               >
                 {loading ? 'Signing in...' : 'Sign In'}
@@ -154,13 +165,13 @@ export default function Landing() {
             <div className="mt-6 text-center">
               <button
                 onClick={() => navigate('/signup')}
-                className="text-[#8b5cf6] hover:text-[#6366f1] font-medium"
+                className="text-[#6366f1] hover:text-[#4f46e5] lg:text-[#8b5cf6] lg:hover:text-[#6366f1] font-medium min-h-[44px] inline-flex items-center justify-center"
               >
                 Don't have an account? Join Now →
               </button>
             </div>
 
-            <p className="text-center text-gray-400 text-sm mt-6 italic">
+            <p className="text-center text-gray-500 lg:text-gray-400 text-sm mt-6 italic">
               PLAYR is where hockey lives.
             </p>
           </div>
