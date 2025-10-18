@@ -85,7 +85,13 @@ export default function MemberCard({
 
   // Handle View Profile
   const handleViewProfile = () => {
-    navigate(`/profile/${id}`)
+    // Navigate to correct public profile based on role
+    if (role === 'club') {
+      navigate(`/clubs/id/${id}`)
+    } else {
+      // Players and Coaches use player profile route
+      navigate(`/players/id/${id}`)
+    }
   }
 
   // Format join date
