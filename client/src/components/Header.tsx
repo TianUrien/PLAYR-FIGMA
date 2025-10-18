@@ -95,6 +95,12 @@ export default function Header() {
             {user && profile ? (
               <>
                 <button
+                  onClick={() => navigate('/community')}
+                  className="text-sm font-medium text-gray-700 hover:text-gray-900 transition-colors"
+                >
+                  Community
+                </button>
+                <button
                   onClick={() => navigate('/opportunities')}
                   className="text-sm font-medium text-gray-700 hover:text-gray-900 transition-colors"
                 >
@@ -142,6 +148,12 @@ export default function Header() {
               </>
             ) : (
               <>
+                <button
+                  onClick={() => navigate('/community')}
+                  className="text-sm font-medium text-gray-700 hover:text-gray-900 transition-colors"
+                >
+                  Community
+                </button>
                 <button
                   onClick={() => navigate('/opportunities')}
                   className="text-sm font-medium text-gray-700 hover:text-gray-900 transition-colors"
@@ -191,6 +203,15 @@ export default function Header() {
                 </div>
                 <button
                   onClick={() => {
+                    navigate('/community')
+                    setMobileMenuOpen(false)
+                  }}
+                  className="block w-full text-left px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50 rounded-lg"
+                >
+                  Community
+                </button>
+                <button
+                  onClick={() => {
                     navigate('/opportunities')
                     setMobileMenuOpen(false)
                   }}
@@ -236,6 +257,15 @@ export default function Header() {
               </div>
             ) : (
               <div className="space-y-2">
+                <button
+                  onClick={() => {
+                    navigate('/community')
+                    setMobileMenuOpen(false)
+                  }}
+                  className="block w-full text-left px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50 rounded-lg"
+                >
+                  Community
+                </button>
                 <button
                   onClick={() => {
                     navigate('/opportunities')
