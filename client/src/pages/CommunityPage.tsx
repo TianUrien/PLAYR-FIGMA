@@ -1,4 +1,4 @@
-import { useState, useEffect, useMemo } from 'react'
+import { useState, useEffect, useMemo, useCallback } from 'react'
 import { Search } from 'lucide-react'
 import { Header, MemberCard } from '@/components'
 import { supabase } from '@/lib/supabase'
@@ -30,13 +30,8 @@ export default function CommunityPage() {
   // Responsive page size
   const pageSize = typeof window !== 'undefined' && window.innerWidth < 768 ? 12 : 24
 
-  // Initial load
-  useEffect(() => {
-    fetchMembers()
-  }, [])
-
   // Fetch members from Supabase
-  const fetchMembers = async () => {
+  const fetchMembers = useCallback(async () => {
     setIsLoading(true)
     try {
       const { data, error } = await supabase
@@ -54,27 +49,15 @@ export default function CommunityPage() {
     } finally {
       setIsLoading(false)
     }
-  }
+  }, [pageSize])
 
-  // Server-side search with debounce
+  // Initial load
   useEffect(() => {
-    if (!searchQuery.trim()) {
-      // Reset to initial load
-      setDisplayedMembers(allMembers.slice(0, pageSize))
-      setPage(1)
-      setHasMore(allMembers.length > pageSize)
-      return
-    }
-
-    const debounceTimer = setTimeout(() => {
-      performServerSearch(searchQuery)
-    }, 500)
-
-    return () => clearTimeout(debounceTimer)
-  }, [searchQuery])
+    fetchMembers()
+  }, [fetchMembers])
 
   // Perform server-side search
-  const performServerSearch = async (query: string) => {
+  const performServerSearch = useCallback(async (query: string) => {
     setIsSearching(true)
     try {
       const searchTerm = `%${query}%`
@@ -97,7 +80,24 @@ export default function CommunityPage() {
     } finally {
       setIsSearching(false)
     }
-  }
+  }, [pageSize])
+
+  // Server-side search with debounce
+  useEffect(() => {
+    if (!searchQuery.trim()) {
+      // Reset to initial load
+      setDisplayedMembers(allMembers.slice(0, pageSize))
+      setPage(1)
+      setHasMore(allMembers.length > pageSize)
+      return
+    }
+
+    const debounceTimer = setTimeout(() => {
+      performServerSearch(searchQuery)
+    }, 500)
+
+    return () => clearTimeout(debounceTimer)
+  }, [searchQuery, allMembers, pageSize, performServerSearch])
 
   // Client-side role filtering
   const filteredMembers = useMemo(() => {
@@ -110,7 +110,7 @@ export default function CommunityPage() {
     setDisplayedMembers(filteredMembers.slice(0, pageSize))
     setPage(1)
     setHasMore(filteredMembers.length > pageSize)
-  }, [filteredMembers, roleFilter])
+  }, [filteredMembers, roleFilter, pageSize])
 
   // Load more handler
   const handleLoadMore = () => {

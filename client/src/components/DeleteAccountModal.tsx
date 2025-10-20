@@ -90,6 +90,7 @@ export default function DeleteAccountModal({ isOpen, onClose, userEmail }: Delet
           <button
             onClick={handleClose}
             className="absolute top-4 right-4 text-gray-400 hover:text-gray-600 transition-colors"
+            aria-label="Close modal"
           >
             <X className="w-5 h-5" />
           </button>

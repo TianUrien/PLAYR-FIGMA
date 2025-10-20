@@ -15,7 +15,7 @@ interface VacancyCardProps {
   hasApplied?: boolean
 }
 
-const BENEFIT_ICONS: Record<string, any> = {
+const BENEFIT_ICONS: Record<string, React.ComponentType<{ className?: string }>> = {
   housing: Home,
   car: Car,
   visa: GlobeIcon,
@@ -87,8 +87,8 @@ export default function VacancyCard({
 
   const isImmediate = !vacancy.start_date || vacancy.start_date === null
 
-  const visibleBenefits = vacancy.benefits.slice(0, 4)
-  const additionalBenefitsCount = vacancy.benefits.length - 4
+  const visibleBenefits = vacancy.benefits?.slice(0, 4) || []
+  const additionalBenefitsCount = Math.max(0, (vacancy.benefits?.length || 0) - 4)
 
   return (
     <div className="bg-white border border-gray-200 rounded-xl p-6 hover:shadow-lg transition-shadow relative group">
@@ -192,7 +192,7 @@ export default function VacancyCard({
       )}
 
       {/* Benefits */}
-      {vacancy.benefits.length > 0 && (
+      {vacancy.benefits && vacancy.benefits.length > 0 && (
         <div className="mb-4">
           <div className="flex flex-wrap gap-2">
             {visibleBenefits.map((benefit) => {
@@ -251,7 +251,7 @@ export default function VacancyCard({
 
       {/* Timestamp */}
       <div className="mt-3 text-xs text-gray-500 text-right">
-        {getTimeAgo(vacancy.created_at)}
+        {getTimeAgo(vacancy.created_at || new Date().toISOString())}
       </div>
     </div>
   )

@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef } from 'react'
+import { useState, useEffect, useRef, useCallback } from 'react'
 import { Upload, Trash2, GripVertical, Edit2, X, Check } from 'lucide-react'
 import { supabase } from '../lib/supabase'
 import { useAuthStore } from '../lib/auth'
@@ -30,7 +30,7 @@ export default function ClubMediaTab({ clubId, readOnly = false }: ClubMediaTabP
   const [altText, setAltText] = useState('')
 
   // Fetch club media
-  const fetchMedia = async () => {
+  const fetchMedia = useCallback(async () => {
     if (!targetClubId) return
     
     setIsLoading(true)
@@ -49,13 +49,13 @@ export default function ClubMediaTab({ clubId, readOnly = false }: ClubMediaTabP
     } finally {
       setIsLoading(false)
     }
-  }
+  }, [targetClubId])
 
   useEffect(() => {
     if (targetClubId) {
       fetchMedia()
     }
-  }, [targetClubId])
+  }, [targetClubId, fetchMedia])
 
   // Validate file
   const validateFile = (file: File): string | null => {
@@ -335,6 +335,7 @@ export default function ClubMediaTab({ clubId, readOnly = false }: ClubMediaTabP
             multiple
             onChange={(e) => handleFileUpload(e.target.files)}
             className="hidden"
+            aria-label="Upload photos"
           />
         </div>
       )}
@@ -352,13 +353,13 @@ export default function ClubMediaTab({ clubId, readOnly = false }: ClubMediaTabP
                   {item.status === 'success' ? '✓' : item.status === 'error' ? '✗' : `${item.progress}%`}
                 </span>
               </div>
-              <div className="w-full bg-gray-200 rounded-full h-2">
+              <div className="w-full bg-gray-200 rounded-full h-2 overflow-hidden">
                 <div
                   className={`h-2 rounded-full transition-all ${
                     item.status === 'success' ? 'bg-green-500' :
                     item.status === 'error' ? 'bg-red-500' : 'bg-blue-500'
                   }`}
-                  style={{ width: `${item.progress}%` }}
+                  style={{ width: `${item.progress}%` } as React.CSSProperties}
                 />
               </div>
               {item.error && (

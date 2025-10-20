@@ -291,10 +291,11 @@ export default function SignUp() {
                     />
 
                     <div>
-                      <label className="block text-sm font-medium text-gray-700 mb-2">
+                      <label htmlFor="position-select" className="block text-sm font-medium text-gray-700 mb-2">
                         Position <span className="text-red-500">*</span>
                       </label>
                       <select
+                        id="position-select"
                         value={formData.position}
                         onChange={(e) => setFormData({ ...formData, position: e.target.value })}
                         className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#6366f1] focus:border-transparent"
@@ -309,10 +310,11 @@ export default function SignUp() {
                     </div>
 
                     <div>
-                      <label className="block text-sm font-medium text-gray-700 mb-2">
+                      <label htmlFor="gender-select" className="block text-sm font-medium text-gray-700 mb-2">
                         Gender <span className="text-red-500">*</span>
                       </label>
                       <select
+                        id="gender-select"
                         value={formData.gender}
                         onChange={(e) => setFormData({ ...formData, gender: e.target.value })}
                         className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#6366f1] focus:border-transparent"

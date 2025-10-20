@@ -1,14 +1,13 @@
 import { useState, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { Mail, Lock, Eye, EyeOff } from 'lucide-react'
-import { Modal, Input, Button } from '@/components'
+import { Eye, EyeOff } from 'lucide-react'
+import { Input, Button } from '@/components'
 import { useAuthStore } from '@/lib/auth'
 import { supabase } from '@/lib/supabase'
 
 export default function Landing() {
   const navigate = useNavigate()
   const { user, profile } = useAuthStore()
-  const [showSignIn, setShowSignIn] = useState(false)
   const [showPassword, setShowPassword] = useState(false)
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')

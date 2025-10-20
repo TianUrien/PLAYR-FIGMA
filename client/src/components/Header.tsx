@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef } from 'react'
+import { useState, useEffect, useRef, useCallback } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { Menu, X, MessageCircle, LogOut, Trash2, Users, Briefcase, LayoutDashboard } from 'lucide-react'
 import { Avatar } from '@/components'
@@ -16,6 +16,28 @@ export default function Header() {
   const dropdownRef = useRef<HTMLDivElement>(null)
 
   // Fetch unread message count
+  const fetchUnreadCount = useCallback(async () => {
+    if (!user) return
+
+    try {
+      const { count } = await supabase
+        .from('messages')
+        .select('*', { count: 'exact', head: true })
+        .neq('sender_id', user.id)
+        .is('read_at', null)
+        .in('conversation_id', 
+          supabase
+            .from('conversations')
+            .select('id')
+            .or(`participant_one_id.eq.${user.id},participant_two_id.eq.${user.id}`) as unknown as string[]
+        )
+
+      setUnreadCount(count || 0)
+    } catch (error) {
+      console.error('Error fetching unread count:', error)
+    }
+  }, [user])
+
   useEffect(() => {
     if (user) {
       fetchUnreadCount()
@@ -40,7 +62,7 @@ export default function Header() {
         supabase.removeChannel(channel)
       }
     }
-  }, [user])
+  }, [user, fetchUnreadCount])
 
   // Close dropdown when clicking outside
   useEffect(() => {
@@ -55,28 +77,6 @@ export default function Header() {
       return () => document.removeEventListener('mousedown', handleClickOutside)
     }
   }, [dropdownOpen])
-
-  const fetchUnreadCount = async () => {
-    if (!user) return
-
-    try {
-      const { count } = await supabase
-        .from('messages')
-        .select('*', { count: 'exact', head: true })
-        .neq('sender_id', user.id)
-        .is('read_at', null)
-        .in('conversation_id', 
-          supabase
-            .from('conversations')
-            .select('id')
-            .or(`participant_one_id.eq.${user.id},participant_two_id.eq.${user.id}`)
-        )
-
-      setUnreadCount(count || 0)
-    } catch (error) {
-      console.error('Error fetching unread count:', error)
-    }
-  }
 
   const handleSignOut = async () => {
     await signOut()
@@ -101,8 +101,7 @@ export default function Header() {
             </button>
             
             <span 
-              className="hidden md:inline-block px-3 py-1 rounded-full text-xs font-medium text-white"
-              style={{ backgroundColor: '#ff9500' }}
+              className="hidden md:inline-block px-3 py-1 rounded-full text-xs font-medium text-white bg-[#ff9500]"
             >
               Make Hockey Better.
             </span>
