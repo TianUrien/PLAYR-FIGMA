@@ -1,15 +1,19 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { Menu, X, MessageCircle } from 'lucide-react'
+import { Menu, X, MessageCircle, LogOut, Trash2, Users, Briefcase, LayoutDashboard } from 'lucide-react'
 import { Avatar } from '@/components'
 import { useAuthStore } from '@/lib/auth'
 import { supabase } from '@/lib/supabase'
+import DeleteAccountModal from './DeleteAccountModal'
 
 export default function Header() {
   const navigate = useNavigate()
   const { user, profile, signOut } = useAuthStore()
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false)
   const [unreadCount, setUnreadCount] = useState(0)
+  const [dropdownOpen, setDropdownOpen] = useState(false)
+  const [deleteModalOpen, setDeleteModalOpen] = useState(false)
+  const dropdownRef = useRef<HTMLDivElement>(null)
 
   // Fetch unread message count
   useEffect(() => {
@@ -37,6 +41,20 @@ export default function Header() {
       }
     }
   }, [user])
+
+  // Close dropdown when clicking outside
+  useEffect(() => {
+    const handleClickOutside = (event: MouseEvent) => {
+      if (dropdownRef.current && !dropdownRef.current.contains(event.target as Node)) {
+        setDropdownOpen(false)
+      }
+    }
+
+    if (dropdownOpen) {
+      document.addEventListener('mousedown', handleClickOutside)
+      return () => document.removeEventListener('mousedown', handleClickOutside)
+    }
+  }, [dropdownOpen])
 
   const fetchUnreadCount = async () => {
     if (!user) return
@@ -98,13 +116,19 @@ export default function Header() {
                   onClick={() => navigate('/community')}
                   className="text-sm font-medium text-gray-700 hover:text-gray-900 transition-colors"
                 >
-                  Community
+                  <div className="flex items-center gap-2">
+                    <Users className="w-5 h-5" />
+                    <span>Community</span>
+                  </div>
                 </button>
                 <button
                   onClick={() => navigate('/opportunities')}
                   className="text-sm font-medium text-gray-700 hover:text-gray-900 transition-colors"
                 >
-                  Opportunities
+                  <div className="flex items-center gap-2">
+                    <Briefcase className="w-5 h-5" />
+                    <span>Opportunities</span>
+                  </div>
                 </button>
                 <button
                   onClick={() => navigate('/messages')}
@@ -124,11 +148,16 @@ export default function Header() {
                   onClick={() => navigate('/dashboard/profile')}
                   className="text-sm font-medium text-gray-700 hover:text-gray-900 transition-colors"
                 >
-                  Dashboard
+                  <div className="flex items-center gap-2">
+                    <LayoutDashboard className="w-5 h-5" />
+                    <span>Dashboard</span>
+                  </div>
                 </button>
-                <div className="flex items-center gap-3">
+                
+                {/* Avatar Dropdown */}
+                <div className="relative" ref={dropdownRef}>
                   <button 
-                    onClick={() => navigate('/dashboard/profile')}
+                    onClick={() => setDropdownOpen(!dropdownOpen)}
                     className="flex items-center gap-2 hover:opacity-80 transition-opacity"
                   >
                     <Avatar
@@ -138,12 +167,32 @@ export default function Header() {
                     />
                     <span className="text-sm font-medium text-gray-700">{profile.full_name}</span>
                   </button>
-                  <button
-                    onClick={handleSignOut}
-                    className="text-sm font-medium text-gray-500 hover:text-gray-700 transition-colors"
-                  >
-                    Sign Out
-                  </button>
+
+                  {/* Dropdown Menu */}
+                  {dropdownOpen && (
+                    <div className="absolute right-0 mt-2 w-48 bg-white rounded-lg shadow-lg border border-gray-200 py-1 z-50">
+                      <button
+                        onClick={() => {
+                          setDropdownOpen(false)
+                          handleSignOut()
+                        }}
+                        className="w-full text-left px-4 py-2 text-sm text-gray-700 hover:bg-gray-50 transition-colors flex items-center gap-2"
+                      >
+                        <LogOut className="w-4 h-4" />
+                        Sign Out
+                      </button>
+                      <button
+                        onClick={() => {
+                          setDropdownOpen(false)
+                          setDeleteModalOpen(true)
+                        }}
+                        className="w-full text-left px-4 py-2 text-sm text-red-600 hover:bg-red-50 transition-colors flex items-center gap-2"
+                      >
+                        <Trash2 className="w-4 h-4" />
+                        Delete Account
+                      </button>
+                    </div>
+                  )}
                 </div>
               </>
             ) : (
@@ -152,13 +201,19 @@ export default function Header() {
                   onClick={() => navigate('/community')}
                   className="text-sm font-medium text-gray-700 hover:text-gray-900 transition-colors"
                 >
-                  Community
+                  <div className="flex items-center gap-2">
+                    <Users className="w-5 h-5" />
+                    <span>Community</span>
+                  </div>
                 </button>
                 <button
                   onClick={() => navigate('/opportunities')}
                   className="text-sm font-medium text-gray-700 hover:text-gray-900 transition-colors"
                 >
-                  Opportunities
+                  <div className="flex items-center gap-2">
+                    <Briefcase className="w-5 h-5" />
+                    <span>Opportunities</span>
+                  </div>
                 </button>
                 <button
                   onClick={() => navigate('/')}
@@ -206,25 +261,31 @@ export default function Header() {
                     navigate('/community')
                     setMobileMenuOpen(false)
                   }}
-                  className="block w-full text-left px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50 rounded-lg"
+                  className="w-full text-left px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50 rounded-lg"
                 >
-                  Community
+                  <div className="flex items-center gap-2">
+                    <Users className="w-5 h-5" />
+                    <span>Community</span>
+                  </div>
                 </button>
                 <button
                   onClick={() => {
                     navigate('/opportunities')
                     setMobileMenuOpen(false)
                   }}
-                  className="block w-full text-left px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50 rounded-lg"
+                  className="w-full text-left px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50 rounded-lg"
                 >
-                  Opportunities
+                  <div className="flex items-center gap-2">
+                    <Briefcase className="w-5 h-5" />
+                    <span>Opportunities</span>
+                  </div>
                 </button>
                 <button
                   onClick={() => {
                     navigate('/messages')
                     setMobileMenuOpen(false)
                   }}
-                  className="relative block w-full text-left px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50 rounded-lg"
+                  className="relative w-full text-left px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50 rounded-lg"
                 >
                   <div className="flex items-center gap-2">
                     <MessageCircle className="w-5 h-5" />
@@ -241,18 +302,36 @@ export default function Header() {
                     navigate('/dashboard/profile')
                     setMobileMenuOpen(false)
                   }}
-                  className="block w-full text-left px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50 rounded-lg"
+                  className="w-full text-left px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50 rounded-lg"
                 >
-                  Dashboard
+                  <div className="flex items-center gap-2">
+                    <LayoutDashboard className="w-5 h-5" />
+                    <span>Dashboard</span>
+                  </div>
                 </button>
                 <button
                   onClick={() => {
                     handleSignOut()
                     setMobileMenuOpen(false)
                   }}
-                  className="block w-full text-left px-4 py-2 text-sm font-medium text-red-600 hover:bg-red-50 rounded-lg"
+                  className="w-full text-left px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50 rounded-lg"
                 >
-                  Sign Out
+                  <div className="flex items-center gap-2">
+                    <LogOut className="w-4 h-4" />
+                    <span>Sign Out</span>
+                  </div>
+                </button>
+                <button
+                  onClick={() => {
+                    setMobileMenuOpen(false)
+                    setDeleteModalOpen(true)
+                  }}
+                  className="w-full text-left px-4 py-2 text-sm font-medium text-red-600 hover:bg-red-50 rounded-lg"
+                >
+                  <div className="flex items-center gap-2">
+                    <Trash2 className="w-4 h-4" />
+                    <span>Delete Account</span>
+                  </div>
                 </button>
               </div>
             ) : (
@@ -262,25 +341,31 @@ export default function Header() {
                     navigate('/community')
                     setMobileMenuOpen(false)
                   }}
-                  className="block w-full text-left px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50 rounded-lg"
+                  className="w-full text-left px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50 rounded-lg"
                 >
-                  Community
+                  <div className="flex items-center gap-2">
+                    <Users className="w-5 h-5" />
+                    <span>Community</span>
+                  </div>
                 </button>
                 <button
                   onClick={() => {
                     navigate('/opportunities')
                     setMobileMenuOpen(false)
                   }}
-                  className="block w-full text-left px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50 rounded-lg"
+                  className="w-full text-left px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50 rounded-lg"
                 >
-                  Opportunities
+                  <div className="flex items-center gap-2">
+                    <Briefcase className="w-5 h-5" />
+                    <span>Opportunities</span>
+                  </div>
                 </button>
                 <button
                   onClick={() => {
                     navigate('/')
                     setMobileMenuOpen(false)
                   }}
-                  className="block w-full text-left px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50 rounded-lg"
+                  className="w-full text-left px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50 rounded-lg"
                 >
                   Sign In
                 </button>
@@ -298,6 +383,15 @@ export default function Header() {
           </div>
         )}
       </nav>
+
+      {/* Delete Account Modal */}
+      {user && (
+        <DeleteAccountModal
+          isOpen={deleteModalOpen}
+          onClose={() => setDeleteModalOpen(false)}
+          userEmail={user.email || ''}
+        />
+      )}
     </header>
   )
 }

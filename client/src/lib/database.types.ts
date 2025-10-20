@@ -105,6 +105,55 @@ export type Database = {
         }
         Relationships: []
       }
+      club_media: {
+        Row: {
+          id: string
+          club_id: string
+          file_url: string
+          file_name: string
+          file_size: number
+          caption: string | null
+          alt_text: string | null
+          order_index: number
+          is_featured: boolean
+          created_at: string
+          updated_at: string
+        }
+        Insert: {
+          id?: string
+          club_id: string
+          file_url: string
+          file_name: string
+          file_size: number
+          caption?: string | null
+          alt_text?: string | null
+          order_index?: number
+          is_featured?: boolean
+          created_at?: string
+          updated_at?: string
+        }
+        Update: {
+          id?: string
+          club_id?: string
+          file_url?: string
+          file_name?: string
+          file_size?: number
+          caption?: string | null
+          alt_text?: string | null
+          order_index?: number
+          is_featured?: boolean
+          created_at?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "club_media_club_id_fkey"
+            columns: ["club_id"]
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          }
+        ]
+      }
       messages: {
         Row: {
           content: string
@@ -599,6 +648,10 @@ export type VacancyApplicationUpdate = Database['public']['Tables']['vacancy_app
 export type GalleryPhoto = Database['public']['Tables']['gallery_photos']['Row']
 export type GalleryPhotoInsert = Database['public']['Tables']['gallery_photos']['Insert']
 export type GalleryPhotoUpdate = Database['public']['Tables']['gallery_photos']['Update']
+
+export type ClubMedia = Database['public']['Tables']['club_media']['Row']
+export type ClubMediaInsert = Database['public']['Tables']['club_media']['Insert']
+export type ClubMediaUpdate = Database['public']['Tables']['club_media']['Update']
 
 export type PlayingHistory = Database['public']['Tables']['playing_history']['Row']
 export type PlayingHistoryInsert = Database['public']['Tables']['playing_history']['Insert']

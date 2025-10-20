@@ -4,6 +4,7 @@ import { useAuthStore } from '@/lib/auth'
 import { Avatar, EditProfileModal } from '@/components'
 import Header from '@/components/Header'
 import VacanciesTab from '@/components/VacanciesTab'
+import ClubMediaTab from '@/components/ClubMediaTab'
 import type { Profile } from '@/lib/database.types'
 import { supabase } from '@/lib/supabase'
 import { useNavigate } from 'react-router-dom'
@@ -220,13 +221,6 @@ export default function ClubDashboard({ profileData, readOnly = false }: ClubDas
 
                     <div>
                       <label className="block text-sm font-medium text-gray-700 mb-1">
-                        Email
-                      </label>
-                      <p className="text-gray-900">{profile.email}</p>
-                    </div>
-
-                    <div>
-                      <label className="block text-sm font-medium text-gray-700 mb-1">
                         Location
                       </label>
                       <p className="text-gray-900">{profile.base_location}</p>
@@ -338,15 +332,22 @@ export default function ClubDashboard({ profileData, readOnly = false }: ClubDas
               </div>
             )}
 
-            {activeTab !== 'overview' && activeTab !== 'vacancies' && (
+            {activeTab === 'media' && (
+              <div className="animate-fade-in">
+                <ClubMediaTab 
+                  clubId={profile.id} 
+                  readOnly={readOnly}
+                />
+              </div>
+            )}
+
+            {activeTab === 'players' && (
               <div className="text-center py-12 animate-fade-in">
                 <div className="w-16 h-16 bg-gray-100 rounded-full flex items-center justify-center mx-auto mb-4">
-                  <span className="text-2xl">
-                    {activeTab === 'players' ? '👥' : '📸'}
-                  </span>
+                  <span className="text-2xl">👥</span>
                 </div>
                 <h3 className="text-lg font-semibold text-gray-900 mb-2">
-                  {tabs.find(t => t.id === activeTab)?.label} Coming Soon
+                  Players Coming Soon
                 </h3>
                 <p className="text-gray-600">
                   This section is under development and will be available soon.
