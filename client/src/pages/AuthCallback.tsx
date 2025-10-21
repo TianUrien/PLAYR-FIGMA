@@ -66,6 +66,19 @@ export default function AuthCallback() {
       }
     }
 
+    // Check hash immediately - if empty, link is invalid
+    const hashParams = new URLSearchParams(window.location.hash.substring(1))
+    const hasTokens = hashParams.has('access_token') || hashParams.has('error')
+    
+    if (!hasTokens && window.location.hash === '#') {
+      console.error('Empty hash detected - link expired or already used')
+      // Get email from localStorage for resend functionality
+      const storedEmail = localStorage.getItem('pending_email')
+      const emailParam = storedEmail ? `&email=${encodeURIComponent(storedEmail)}` : ''
+      navigate(`/verify-email?error=expired&reason=no_tokens${emailParam}`)
+      return
+    }
+
     // OPTION 1: Listen for auth state change (preferred)
     const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, session) => {
       console.log('Auth state change:', event, session?.user?.id)
@@ -97,18 +110,11 @@ export default function AuthCallback() {
           return
         }
 
-        // If no tokens in hash, check existing session
+        // If no tokens in hash, link is invalid/expired/already used
         if (!accessToken) {
-          console.log('No tokens in hash, checking existing session')
-          const { data: { session } } = await supabase.auth.getSession()
-
-          if (session) {
-            console.log('Existing session found')
-            await handleSession(session.user.id)
-          } else {
-            console.error('No session found')
-            navigate('/verify-email?error=no_session')
-          }
+          console.error('No tokens in hash - link expired or already used')
+          // Redirect to verify-email with expired error and resend option
+          navigate('/verify-email?error=expired&reason=no_tokens')
           return
         }
 
