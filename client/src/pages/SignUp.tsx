@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { Eye, EyeOff, User, Mail, Lock, MapPin, Globe, Calendar, Upload, Building2, Briefcase } from 'lucide-react'
 import { Input, Button } from '@/components'
@@ -12,6 +12,7 @@ export default function SignUp() {
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')
   const [showPassword, setShowPassword] = useState(false)
+  const [checkingSession, setCheckingSession] = useState(true)
 
   // Form data states
   const [formData, setFormData] = useState({
@@ -32,6 +33,44 @@ export default function SignUp() {
     clubBio: '',
     clubHistory: ''
   })
+
+  // Check for existing session on mount (user coming from email verification)
+  useEffect(() => {
+    const checkExistingSession = async () => {
+      try {
+        const { data: { session } } = await supabase.auth.getSession()
+        
+        if (session?.user) {
+          // User has a verified session, check their profile
+          const { data: profile } = await supabase
+            .from('profiles')
+            .select('role, full_name')
+            .eq('id', session.user.id)
+            .single()
+
+          if (profile) {
+            // If profile has full_name, they've completed signup - go to dashboard
+            if (profile.full_name) {
+              navigate('/dashboard/profile')
+              return
+            }
+            
+            // Profile exists with role but no full_name - set role and show form
+            if (profile.role) {
+              setSelectedRole(profile.role as UserRole)
+              setFormData(prev => ({ ...prev, email: session.user.email || '' }))
+            }
+          }
+        }
+      } catch (error) {
+        console.error('Error checking session:', error)
+      } finally {
+        setCheckingSession(false)
+      }
+    }
+
+    checkExistingSession()
+  }, [navigate])
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
@@ -68,6 +107,18 @@ export default function SignUp() {
       setError(err instanceof Error ? err.message : 'Sign up failed. Please try again.')
       setLoading(false)
     }
+  }
+
+  // Show loading while checking for existing session
+  if (checkingSession) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-gray-50">
+        <div className="text-center">
+          <div className="inline-block animate-spin rounded-full h-12 w-12 border-b-2 border-[#6366f1] mb-4"></div>
+          <p className="text-gray-600">Loading...</p>
+        </div>
+      </div>
+    )
   }
 
   return (
