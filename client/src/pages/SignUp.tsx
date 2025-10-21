@@ -1,17 +1,14 @@
 import { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { Eye, EyeOff, User, Mail, Lock, MapPin, Globe, Calendar, Upload, Check, Building2, Briefcase } from 'lucide-react'
+import { Eye, EyeOff, User, Mail, Lock, MapPin, Globe, Calendar, Upload, Building2, Briefcase } from 'lucide-react'
 import { Input, Button } from '@/components'
 import { supabase } from '@/lib/supabase'
-import { useAuthStore } from '@/lib/auth'
 
 type UserRole = 'player' | 'coach' | 'club'
 
 export default function SignUp() {
   const navigate = useNavigate()
-  const { fetchProfile } = useAuthStore()
   const [selectedRole, setSelectedRole] = useState<UserRole | null>(null)
-  const [showSuccess, setShowSuccess] = useState(false)
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')
   const [showPassword, setShowPassword] = useState(false)
@@ -46,13 +43,14 @@ export default function SignUp() {
         throw new Error('Password must be at least 8 characters long')
       }
 
+      // Create auth account (no session until email verified)
       const { data: authData, error: signUpError } = await supabase.auth.signUp({
         email: formData.email,
         password: formData.password,
         options: {
-          emailRedirectTo: `${window.location.origin}/dashboard/profile`,
+          emailRedirectTo: `${window.location.origin}/auth/callback`,
           data: {
-            full_name: selectedRole === 'club' ? formData.clubName : formData.fullName,
+            role: selectedRole,
           }
         }
       })
@@ -60,47 +58,14 @@ export default function SignUp() {
       if (signUpError) throw signUpError
       if (!authData.user) throw new Error('No user data returned from signup')
 
-      const profileData: Record<string, unknown> = {
-        id: authData.user.id,
-        full_name: selectedRole === 'club' ? formData.clubName : formData.fullName,
-        email: formData.email,
-        role: selectedRole,
-        base_location: formData.city,
-      }
+      // Store email for verification page
+      localStorage.setItem('pendingVerificationEmail', formData.email)
 
-      if (selectedRole === 'player') {
-        profileData.nationality = formData.nationality
-        profileData.position = formData.position
-        profileData.gender = formData.gender
-        profileData.date_of_birth = formData.dateOfBirth || null
-      } else if (selectedRole === 'coach') {
-        profileData.nationality = formData.country
-      } else if (selectedRole === 'club') {
-        profileData.nationality = formData.country
-        profileData.year_founded = formData.yearFounded ? parseInt(formData.yearFounded) : null
-        profileData.league_division = formData.leagueDivision || null
-        profileData.website = formData.website || null
-        profileData.contact_email = formData.contactEmail || null
-        profileData.club_bio = formData.clubBio || null
-        profileData.club_history = formData.clubHistory || null
-      }
+      // Redirect to verification page (no profile creation yet)
+      navigate(`/verify-email?email=${encodeURIComponent(formData.email)}`)
 
-      // @ts-expect-error - Dynamic profile data based on role
-      const { error: profileError } = await supabase
-        .from('profiles')
-        .insert(profileData)
-
-      if (profileError) {
-        throw new Error(`Profile creation failed: ${profileError.message}`)
-      }
-
-      // Fetch the newly created profile to update auth store
-      await fetchProfile(authData.user.id)
-
-      setShowSuccess(true)
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Sign up failed. Please try again.')
-    } finally {
       setLoading(false)
     }
   }
@@ -119,42 +84,21 @@ export default function SignUp() {
 
       <div className="relative z-10 w-full max-w-2xl">
         <div className="bg-white rounded-2xl shadow-2xl animate-scale-in overflow-hidden">
-          {showSuccess ? (
-            <div className="p-12 text-center">
-              <div className="flex items-center justify-center mb-6">
-                <div className="w-20 h-20 rounded-full bg-green-100 flex items-center justify-center">
-                  <Check className="w-10 h-10 text-green-600" />
-                </div>
+          <>
+            <div className="p-6 border-b border-gray-200 bg-gradient-to-r from-[#6366f1] to-[#8b5cf6]">
+              <div className="flex items-center gap-3 mb-2">
+                <img 
+                  src="/PLAYR logo White.png" 
+                  alt="PLAYR" 
+                  className="h-8"
+                />
               </div>
-              <h2 className="text-3xl font-bold text-gray-900 mb-2">
-                Welcome to PLAYR, {selectedRole === 'player' ? 'Player' : selectedRole === 'coach' ? 'Coach' : 'Club'}!
-              </h2>
-              <p className="text-gray-600 mb-8">
-                Your account has been created successfully. Let's get started!
+              <p className="text-white/90 text-sm">
+                Create your account and start your field hockey journey
               </p>
-              <Button
-                onClick={() => navigate('/dashboard/profile')}
-                className="bg-gradient-to-r from-[#6366f1] to-[#8b5cf6] px-8"
-              >
-                Go to Dashboard
-              </Button>
             </div>
-          ) : (
-            <>
-              <div className="p-6 border-b border-gray-200 bg-gradient-to-r from-[#6366f1] to-[#8b5cf6]">
-                <div className="flex items-center gap-3 mb-2">
-                  <img 
-                    src="/PLAYR logo White.png" 
-                    alt="PLAYR" 
-                    className="h-8"
-                  />
-                </div>
-                <p className="text-white/90 text-sm">
-                  Create your account and start your field hockey journey
-                </p>
-              </div>
 
-              {!selectedRole && (
+            {!selectedRole && (
                 <div className="p-8">
                   <h3 className="text-2xl font-bold text-gray-900 mb-2 text-center">Join PLAYR</h3>
                   <p className="text-gray-600 mb-8 text-center">Select your role to get started</p>
@@ -606,7 +550,6 @@ export default function SignUp() {
                 </form>
               )}
             </>
-          )}
         </div>
       </div>
     </div>

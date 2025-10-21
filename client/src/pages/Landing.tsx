@@ -32,7 +32,15 @@ export default function Landing() {
         password
       })
 
-      if (signInError) throw signInError
+      if (signInError) {
+        // Check if error is due to unverified email
+        if (signInError.message.includes('Email not confirmed')) {
+          // Redirect to verification page
+          navigate(`/verify-email?email=${encodeURIComponent(email)}&reason=unverified_signin`)
+          return
+        }
+        throw signInError
+      }
 
       if (data.user) {
         // Check if profile exists

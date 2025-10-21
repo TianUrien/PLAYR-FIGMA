@@ -67,3 +67,36 @@ export const initializeAuth = () => {
   
   return subscription
 }
+
+/**
+ * Resend email verification
+ * Used when user didn't receive the initial verification email
+ */
+export const resendVerificationEmail = async (email: string): Promise<{ success: boolean; error?: string }> => {
+  try {
+    const { error } = await supabase.auth.resend({
+      type: 'signup',
+      email: email,
+    })
+
+    if (error) {
+      console.error('Error resending verification email:', error)
+      
+      // Handle specific error cases
+      if (error.message.includes('rate limit')) {
+        return { success: false, error: 'Too many requests. Please wait a few minutes before trying again.' }
+      }
+      
+      if (error.message.includes('already confirmed')) {
+        return { success: false, error: 'This email is already verified. Try signing in.' }
+      }
+      
+      return { success: false, error: error.message }
+    }
+
+    return { success: true }
+  } catch (err) {
+    console.error('Unexpected error resending verification:', err)
+    return { success: false, error: 'An unexpected error occurred. Please try again.' }
+  }
+}
