@@ -62,6 +62,41 @@ export default function CompleteProfile() {
           .eq('id', session.user.id)
           .single()
 
+        // If profile doesn't exist, create it now
+        if (profileError && profileError.code === 'PGRST116') {
+          console.log('Profile not found, creating basic profile')
+          
+          // Get role from user metadata or localStorage
+          const role = session.user.user_metadata?.role || localStorage.getItem('pending_role') || 'player'
+          
+          // Create basic profile (type assertion needed until DB types are regenerated after migration)
+          const { error: insertError } = await supabase
+            .from('profiles')
+            .insert({
+              id: session.user.id,
+              email: session.user.email!,
+              role: role,
+              full_name: null,
+              base_location: null,
+              nationality: null
+            } as unknown as never)
+
+          if (insertError) {
+            console.error('Error creating profile:', insertError)
+            setError('Could not create your profile. Please try again or contact support.')
+            setCheckingProfile(false)
+            return
+          }
+
+          console.log('Basic profile created successfully')
+
+          // Use the newly created profile
+          setUserRole(role as UserRole)
+          setFormData(prev => ({ ...prev, contactEmail: session.user.email || '' }))
+          setCheckingProfile(false)
+          return
+        }
+
         if (profileError) {
           console.error('Error fetching profile:', profileError)
           setError('Could not load your profile. Please try again.')
@@ -70,7 +105,7 @@ export default function CompleteProfile() {
         }
 
         if (!profile) {
-          console.error('Profile not found')
+          console.error('Profile not found and could not be created')
           setError('Profile not found. Please contact support.')
           setCheckingProfile(false)
           return
