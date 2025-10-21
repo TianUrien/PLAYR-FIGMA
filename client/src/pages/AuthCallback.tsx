@@ -1,86 +1,119 @@
-import { useEffect, useState, useCallback } from 'react'
+import { useEffect, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { supabase } from '@/lib/supabase'
 
 /**
  * AuthCallback - Handles email verification redirect from Supabase
  * 
- * Flow:
- * 1. User clicks verification link in email
- * 2. Supabase confirms email and redirects here with tokens
- * 3. Extract tokens, set session
- * 4. Check if profile is complete (has full_name)
- * 5. Route to /signup (complete profile) or /dashboard/profile (already complete)
+ * ROBUST APPROACH:
+ * 1. Listen for onAuthStateChange (SIGNED_IN event)
+ * 2. Fallback: manually extract hash params and setSession
+ * 3. Wait patiently for session to establish
+ * 4. Check profile completion
+ * 5. Route to /complete-profile (incomplete) or /dashboard (complete)
+ * 
+ * NEVER redirect away before session is confirmed!
  */
 export default function AuthCallback() {
   const navigate = useNavigate()
   const [error, setError] = useState<string | null>(null)
-
-  // Check if profile is complete and route accordingly
-  const checkProfileAndRoute = useCallback(async (userId: string) => {
-    try {
-      const { data: profile, error: profileError } = await supabase
-        .from('profiles')
-        .select('full_name, role')
-        .eq('id', userId)
-        .single()
-
-      if (profileError) {
-        console.error('Error fetching profile:', profileError)
-        // Profile doesn't exist yet (shouldn't happen with trigger, but handle it)
-        navigate('/signup')
-        return
-      }
-
-      // Check if profile is complete (has full_name filled in)
-      if (!profile.full_name) {
-        // Profile exists but incomplete - go to signup to complete it
-        console.log('Profile incomplete, routing to /signup')
-        navigate('/signup')
-      } else {
-        // Profile is complete - go to dashboard
-        console.log('Profile complete, routing to /dashboard/profile')
-        navigate('/dashboard/profile')
-      }
-    } catch (err) {
-      console.error('Error checking profile:', err)
-      navigate('/signup')
-    }
-  }, [navigate])
+  const [status, setStatus] = useState<string>('Verifying your email...')
 
   useEffect(() => {
-    const handleCallback = async () => {
+    let sessionEstablished = false
+
+    const handleSession = async (userId: string) => {
+      if (sessionEstablished) return
+      sessionEstablished = true
+
+      console.log('Session established for user:', userId)
+      setStatus('Loading your profile...')
+
       try {
-        // Get URL parameters
+        // Fetch profile to check completion
+        const { data: profile, error: profileError } = await supabase
+          .from('profiles')
+          .select('full_name, role')
+          .eq('id', userId)
+          .single()
+
+        if (profileError) {
+          console.error('Error fetching profile:', profileError)
+          setError('Could not load your profile. Please try again or contact support.')
+          return
+        }
+
+        if (!profile) {
+          console.error('Profile not found')
+          setError('Profile not found. Please contact support.')
+          return
+        }
+
+        console.log('Profile found:', profile)
+
+        // Check if profile is complete
+        if (!profile.full_name) {
+          console.log('Profile incomplete, routing to /complete-profile')
+          navigate('/complete-profile')
+        } else {
+          console.log('Profile complete, routing to /dashboard')
+          navigate('/dashboard/profile')
+        }
+
+      } catch (err) {
+        console.error('Error checking profile:', err)
+        setError('Something went wrong. Please try again.')
+      }
+    }
+
+    // OPTION 1: Listen for auth state change (preferred)
+    const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, session) => {
+      console.log('Auth state change:', event, session?.user?.id)
+
+      if (event === 'SIGNED_IN' && session) {
+        await handleSession(session.user.id)
+      }
+    })
+
+    // OPTION 2: Fallback - manually process hash if no event after timeout
+    const timeoutId = setTimeout(async () => {
+      if (sessionEstablished) return
+
+      console.log('Fallback: manually processing hash parameters')
+      setStatus('Establishing session...')
+
+      try {
+        // Get URL hash parameters
         const params = new URLSearchParams(window.location.hash.substring(1))
         const accessToken = params.get('access_token')
         const refreshToken = params.get('refresh_token')
         const errorParam = params.get('error')
         const errorDescription = params.get('error_description')
 
-        // Check for errors in URL (expired/invalid link)
+        // Check for errors in URL
         if (errorParam) {
-          console.error('Auth callback error:', errorParam, errorDescription)
-          navigate(`/verify-email?error=${errorParam}`)
+          console.error('Auth error in URL:', errorParam, errorDescription)
+          navigate(`/verify-email?error=${encodeURIComponent(errorParam)}`)
           return
         }
 
-        // If no tokens, check if there's already a session
+        // If no tokens in hash, check existing session
         if (!accessToken) {
+          console.log('No tokens in hash, checking existing session')
           const { data: { session } } = await supabase.auth.getSession()
-          
-          if (!session) {
-            console.error('No tokens and no existing session')
-            navigate('/verify-email?error=no_session')
-            return
-          }
 
-          // Session exists, continue with profile check
-          await checkProfileAndRoute(session.user.id)
+          if (session) {
+            console.log('Existing session found')
+            await handleSession(session.user.id)
+          } else {
+            console.error('No session found')
+            navigate('/verify-email?error=no_session')
+          }
           return
         }
 
-        // Set session with tokens from URL
+        // Manually set session with tokens from URL
+        console.log('Setting session manually with tokens')
         const { data: { session }, error: sessionError } = await supabase.auth.setSession({
           access_token: accessToken,
           refresh_token: refreshToken!
@@ -98,17 +131,21 @@ export default function AuthCallback() {
           return
         }
 
-        // Session created successfully, check profile
-        await checkProfileAndRoute(session.user.id)
+        // Session created, handle it
+        await handleSession(session.user.id)
 
       } catch (err) {
-        console.error('Auth callback error:', err)
-        setError('Something went wrong during verification. Please try signing in.')
+        console.error('Fallback error:', err)
+        setError('Could not establish session. Please try again.')
       }
-    }
+    }, 2000) // Wait 2 seconds for onAuthStateChange
 
-    handleCallback()
-  }, [navigate, checkProfileAndRoute])
+    // Cleanup
+    return () => {
+      subscription.unsubscribe()
+      clearTimeout(timeoutId)
+    }
+  }, [navigate])
 
   if (error) {
     return (
@@ -136,7 +173,7 @@ export default function AuthCallback() {
     <div className="min-h-screen flex items-center justify-center bg-gray-50">
       <div className="text-center">
         <div className="inline-block animate-spin rounded-full h-12 w-12 border-b-2 border-[#6366f1] mb-4"></div>
-        <p className="text-gray-600">Verifying your email...</p>
+        <p className="text-gray-600">{status}</p>
       </div>
     </div>
   )

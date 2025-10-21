@@ -9,3 +9,6 @@ export { default as DeleteAccountModal } from './DeleteAccountModal'
 export { default as MemberCard } from './MemberCard'
 export { default as ResendVerificationButton } from './ResendVerificationButton'
 export { ErrorBoundary } from './ErrorBoundary'
+
+// Auth & Routing
+export { default as ProtectedRoute } from './ProtectedRoute'
