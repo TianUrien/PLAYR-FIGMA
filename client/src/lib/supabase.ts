@@ -9,8 +9,15 @@ if (!supabaseUrl || !supabaseAnonKey) {
   throw new Error('Missing Supabase environment variables')
 }
 
-// Create Supabase client with typed database
-export const supabase = createClient<Database>(supabaseUrl, supabaseAnonKey)
+// Create Supabase client with typed database and PKCE flow
+export const supabase = createClient<Database>(supabaseUrl, supabaseAnonKey, {
+  auth: {
+    flowType: 'pkce', // Use PKCE flow for better security and hash-based redirects
+    autoRefreshToken: true,
+    persistSession: true,
+    detectSessionInUrl: true, // Automatically detect session from URL hash
+  }
+})
 
 // Export types
 export type Profile = Database['public']['Tables']['profiles']['Row']
