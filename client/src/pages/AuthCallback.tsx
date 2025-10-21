@@ -66,11 +66,17 @@ export default function AuthCallback() {
       }
     }
 
-    // Check hash immediately - if empty, link is invalid
-    const hashParams = new URLSearchParams(window.location.hash.substring(1))
-    const hasTokens = hashParams.has('access_token') || hashParams.has('error')
+    // Check hash immediately - if truly empty, link is invalid
+    const hash = window.location.hash
+    const hashParams = new URLSearchParams(hash.substring(1))
+    const hasAccessToken = hashParams.has('access_token')
+    const hasError = hashParams.has('error')
     
-    if (!hasTokens && window.location.hash === '#') {
+    console.log('AuthCallback loaded with hash:', hash)
+    console.log('Has access_token:', hasAccessToken, 'Has error:', hasError)
+    
+    // Only redirect if hash is completely empty or just '#'
+    if ((!hasAccessToken && !hasError) && (hash === '' || hash === '#')) {
       console.error('Empty hash detected - link expired or already used')
       // Get email from localStorage for resend functionality
       const storedEmail = localStorage.getItem('pending_email')
