@@ -10,14 +10,15 @@ if (!supabaseUrl || !supabaseAnonKey) {
 }
 
 // Create Supabase client with typed database
-// Using implicit flow for better compatibility with Supabase email verification
+// Using PKCE flow - the correct flow for server-side email verification
 export const supabase = createClient<Database>(supabaseUrl, supabaseAnonKey, {
   auth: {
-    flowType: 'implicit', // Implicit flow works better with Supabase email verification
+    flowType: 'pkce', // PKCE is the correct flow for Supabase email verification
     autoRefreshToken: true,
     persistSession: true,
-    detectSessionInUrl: true, // Automatically detect session from URL hash
+    detectSessionInUrl: true, // Automatically detect and exchange tokens from URL
     storage: typeof window !== 'undefined' ? window.localStorage : undefined,
+    storageKey: 'playr-auth', // Custom storage key to avoid conflicts
   }
 })
 
