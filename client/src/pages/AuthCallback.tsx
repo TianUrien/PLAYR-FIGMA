@@ -66,7 +66,31 @@ export default function AuthCallback() {
       }
     }
 
-    // Check hash immediately - if truly empty, link is invalid
+    // 🔑 PKCE CODE EXCHANGE - Check for ?code= parameter first (email verification)
+    const queryParams = new URLSearchParams(window.location.search)
+    const pkceCode = queryParams.get('code')
+    
+    if (pkceCode) {
+      console.log('🔑 PKCE code detected, exchanging for session...')
+      setStatus('Exchanging authorization code...')
+      
+      supabase.auth.exchangeCodeForSession(pkceCode).then(({ data, error: exchangeError }) => {
+        if (exchangeError) {
+          console.error('Code exchange failed:', exchangeError)
+          setError('Verification failed. Please try again or request a new link.')
+          setTimeout(() => navigate('/verify-email?error=exchange_failed'), 2000)
+          return
+        }
+        
+        if (data.session) {
+          console.log('✅ Code exchange successful, session established')
+          handleSession(data.session.user.id)
+        }
+      })
+      return // Exit early - code exchange will handle the rest
+    }
+
+    // Check hash for implicit flow tokens (fallback for other auth methods)
     const hash = window.location.hash
     const hashParams = new URLSearchParams(hash.substring(1))
     const hasAccessToken = hashParams.has('access_token')
@@ -75,9 +99,9 @@ export default function AuthCallback() {
     console.log('AuthCallback loaded with hash:', hash)
     console.log('Has access_token:', hasAccessToken, 'Has error:', hasError)
     
-    // Only redirect if hash is completely empty or just '#'
-    if ((!hasAccessToken && !hasError) && (hash === '' || hash === '#')) {
-      console.error('Empty hash detected - link expired or already used')
+    // Only redirect if both query and hash are empty
+    if (!pkceCode && (!hasAccessToken && !hasError) && (hash === '' || hash === '#')) {
+      console.error('Empty hash and no code - link expired or already used')
       // Get email from localStorage for resend functionality
       const storedEmail = localStorage.getItem('pending_email')
       const emailParam = storedEmail ? `&email=${encodeURIComponent(storedEmail)}` : ''
