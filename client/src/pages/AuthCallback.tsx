@@ -110,85 +110,78 @@ export default function AuthCallback() {
     const hasAccessToken = hashParams.has('access_token')
     const hasError = hashParams.has('error')
     
-    console.log('AuthCallback loaded with hash:', hash)
+    console.log('🔍 AuthCallback initialized')
+    console.log('URL:', window.location.href)
+    console.log('Hash:', hash)
     console.log('Has access_token:', hasAccessToken, 'Has error:', hasError)
     
-    // Only redirect if both query and hash are empty
-    if (!pkceCode && (!hasAccessToken && !hasError) && (hash === '' || hash === '#')) {
-      console.error('Empty hash and no code - link expired or already used')
-      // Get email from localStorage for resend functionality
-      const storedEmail = localStorage.getItem('pending_email')
-      const emailParam = storedEmail ? `&email=${encodeURIComponent(storedEmail)}` : ''
-      navigate(`/verify-email?error=expired&reason=no_tokens${emailParam}`)
-      return
-    }
-
     // OPTION 1: Listen for auth state change (preferred)
+    // This will catch BOTH PKCE and implicit flow sessions
     const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, session) => {
-      console.log('Auth state change:', event, session?.user?.id)
+      console.log('🔔 Auth state change:', event, session?.user?.id)
 
       if (event === 'SIGNED_IN' && session) {
         await handleSession(session.user.id)
       }
     })
 
-    // OPTION 2: Fallback - manually process hash if no event after timeout
+    // OPTION 2: Fallback - check for errors or manually process after delay
     const timeoutId = setTimeout(async () => {
       if (sessionEstablished) return
 
-      console.log('Fallback: manually processing hash parameters')
-      setStatus('Establishing session...')
+      console.log('⏱️ Timeout: Checking session status...')
+      
+      // First check if SDK already established a session
+      const { data: { session } } = await supabase.auth.getSession()
+      if (session) {
+        console.log('✅ Session found via getSession()')
+        await handleSession(session.user.id)
+        return
+      }
 
-      try {
-        // Get URL hash parameters
-        const params = new URLSearchParams(window.location.hash.substring(1))
-        const accessToken = params.get('access_token')
-        const refreshToken = params.get('refresh_token')
-        const errorParam = params.get('error')
-        const errorDescription = params.get('error_description')
+      // No session found - check if there were tokens to process
+      const params = new URLSearchParams(window.location.hash.substring(1))
+      const accessToken = params.get('access_token')
+      const refreshToken = params.get('refresh_token')
+      const errorParam = params.get('error')
+      
+      if (errorParam) {
+        console.error('❌ Auth error in URL:', errorParam)
+        navigate(`/verify-email?error=${encodeURIComponent(errorParam)}`)
+        return
+      }
+      
+      if (accessToken && refreshToken) {
+        // Tokens exist but session not established - try manually
+        console.log('🔧 Manually setting session with hash tokens...')
+        setStatus('Establishing session...')
 
-        // Check for errors in URL
-        if (errorParam) {
-          console.error('Auth error in URL:', errorParam, errorDescription)
-          navigate(`/verify-email?error=${encodeURIComponent(errorParam)}`)
-          return
-        }
-
-        // If no tokens in hash, link is invalid/expired/already used
-        if (!accessToken) {
-          console.error('No tokens in hash - link expired or already used')
-          // Redirect to verify-email with expired error and resend option
-          navigate('/verify-email?error=expired&reason=no_tokens')
-          return
-        }
-
-        // Manually set session with tokens from URL
-        console.log('Setting session manually with tokens')
         const { data: { session }, error: sessionError } = await supabase.auth.setSession({
           access_token: accessToken,
-          refresh_token: refreshToken!
+          refresh_token: refreshToken
         })
 
         if (sessionError) {
-          console.error('Error setting session:', sessionError)
+          console.error('❌ Error setting session:', sessionError)
           navigate('/verify-email?error=session_failed')
           return
         }
 
-        if (!session) {
-          console.error('Session not created')
-          navigate('/verify-email?error=no_session')
+        if (session) {
+          console.log('✅ Session created manually')
+          await handleSession(session.user.id)
           return
         }
-
-        // Session created, handle it
-        await handleSession(session.user.id)
-
-      } catch (err) {
-        console.error('Fallback error:', err)
-        setError('Could not establish session. Please try again.')
       }
-    }, 2000) // Wait 2 seconds for onAuthStateChange
+
+      // No tokens, no session, no code - link is invalid/expired
+      if (!pkceCode && !hasAccessToken) {
+        console.error('❌ No tokens found - link expired or already used')
+        const storedEmail = localStorage.getItem('pending_email')
+        const emailParam = storedEmail ? `&email=${encodeURIComponent(storedEmail)}` : ''
+        navigate(`/verify-email?error=expired&reason=no_tokens${emailParam}`)
+      }
+    }, 3000) // Wait 3 seconds for SDK to process URL
 
     // Cleanup
     return () => {
