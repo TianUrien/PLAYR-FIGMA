@@ -71,22 +71,36 @@ export default function AuthCallback() {
     const pkceCode = queryParams.get('code')
     
     if (pkceCode) {
-      console.log('🔑 PKCE code detected, exchanging for session...')
+      console.log('🔑 PKCE code detected:', pkceCode.substring(0, 20) + '...')
+      console.log('Full URL:', window.location.href)
       setStatus('Exchanging authorization code...')
       
-      supabase.auth.exchangeCodeForSession(pkceCode).then(({ data, error: exchangeError }) => {
-        if (exchangeError) {
-          console.error('Code exchange failed:', exchangeError)
-          setError('Verification failed. Please try again or request a new link.')
-          setTimeout(() => navigate('/verify-email?error=exchange_failed'), 2000)
-          return
-        }
-        
-        if (data.session) {
-          console.log('✅ Code exchange successful, session established')
-          handleSession(data.session.user.id)
-        }
-      })
+      // Exchange code for session with proper error handling
+      supabase.auth.exchangeCodeForSession(pkceCode)
+        .then(({ data, error: exchangeError }) => {
+          if (exchangeError) {
+            console.error('❌ Code exchange failed:', exchangeError.message, exchangeError)
+            setError(`Verification failed: ${exchangeError.message}`)
+            setTimeout(() => navigate('/verify-email?error=exchange_failed'), 3000)
+            return
+          }
+          
+          if (data.session) {
+            console.log('✅ Code exchange successful, session established')
+            console.log('User ID:', data.session.user.id)
+            handleSession(data.session.user.id)
+          } else {
+            console.error('❌ No session returned after code exchange')
+            setError('No session created. Please try again.')
+            setTimeout(() => navigate('/verify-email?error=no_session'), 3000)
+          }
+        })
+        .catch((err) => {
+          console.error('💥 Unexpected error during code exchange:', err)
+          setError('An unexpected error occurred. Please try again.')
+          setTimeout(() => navigate('/verify-email?error=exchange_failed'), 3000)
+        })
+      
       return // Exit early - code exchange will handle the rest
     }
 
