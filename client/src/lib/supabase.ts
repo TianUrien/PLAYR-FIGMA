@@ -9,13 +9,15 @@ if (!supabaseUrl || !supabaseAnonKey) {
   throw new Error('Missing Supabase environment variables')
 }
 
-// Create Supabase client with typed database and PKCE flow
+// Create Supabase client with typed database
+// Using implicit flow for better compatibility with Supabase email verification
 export const supabase = createClient<Database>(supabaseUrl, supabaseAnonKey, {
   auth: {
-    flowType: 'pkce', // Use PKCE flow for better security and hash-based redirects
+    flowType: 'implicit', // Implicit flow works better with Supabase email verification
     autoRefreshToken: true,
     persistSession: true,
     detectSessionInUrl: true, // Automatically detect session from URL hash
+    storage: typeof window !== 'undefined' ? window.localStorage : undefined,
   }
 })
 
