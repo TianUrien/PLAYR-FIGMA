@@ -37,6 +37,14 @@ export default function AuthCallback() {
           .eq('id', userId)
           .single()
 
+        // If profile doesn't exist (PGRST116), send to CompleteProfile to create it
+        if (profileError && profileError.code === 'PGRST116') {
+          console.log('Profile not found (new user), routing to /complete-profile to create it')
+          navigate('/complete-profile')
+          return
+        }
+
+        // Other errors
         if (profileError) {
           console.error('Error fetching profile:', profileError)
           setError('Could not load your profile. Please try again or contact support.')
@@ -44,7 +52,7 @@ export default function AuthCallback() {
         }
 
         if (!profile) {
-          console.error('Profile not found')
+          console.error('Profile is null (unexpected)')
           setError('Profile not found. Please contact support.')
           return
         }
