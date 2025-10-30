@@ -121,7 +121,7 @@ export default function Header() {
             <span 
               className="hidden md:inline-block px-3 py-1 rounded-full text-xs font-medium text-white bg-[#ff9500]"
             >
-              Make Hockey Better.
+              The Home of Field Hockey.
             </span>
           </div>
 
