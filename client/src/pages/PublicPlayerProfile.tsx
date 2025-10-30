@@ -4,6 +4,7 @@ import { ArrowLeft } from 'lucide-react'
 import { supabase } from '../lib/supabase'
 import type { Profile } from '../lib/database.types'
 import PlayerDashboard from './PlayerDashboard'
+import CoachDashboard from './CoachDashboard'
 
 export default function PublicPlayerProfile() {
   const { username, id } = useParams<{ username?: string; id?: string }>()
@@ -23,13 +24,13 @@ export default function PublicPlayerProfile() {
           const { data, error: fetchError } = await supabase
             .from('profiles')
             .select('*')
-            .eq('role', 'player')
+            .in('role', ['player', 'coach']) // Support both players and coaches
             .eq('username', username)
             .single()
 
           if (fetchError) {
             if (fetchError.code === 'PGRST116') {
-              setError('Player profile not found.')
+              setError('Profile not found.')
             } else {
               throw fetchError
             }
@@ -41,13 +42,13 @@ export default function PublicPlayerProfile() {
           const { data, error: fetchError } = await supabase
             .from('profiles')
             .select('*')
-            .eq('role', 'player')
+            .in('role', ['player', 'coach']) // Support both players and coaches
             .eq('id', id)
             .single()
 
           if (fetchError) {
             if (fetchError.code === 'PGRST116') {
-              setError('Player profile not found.')
+              setError('Profile not found.')
             } else {
               throw fetchError
             }
@@ -60,8 +61,8 @@ export default function PublicPlayerProfile() {
           return
         }
       } catch (err) {
-        console.error('Error fetching player profile:', err)
-        setError('Failed to load player profile. Please try again.')
+        console.error('Error fetching profile:', err)
+        setError('Failed to load profile. Please try again.')
       } finally {
         setIsLoading(false)
       }
@@ -75,7 +76,7 @@ export default function PublicPlayerProfile() {
       <div className="min-h-screen bg-gray-50 flex items-center justify-center">
         <div className="text-center">
           <div className="inline-block animate-spin rounded-full h-12 w-12 border-4 border-gray-300 border-t-blue-600 mb-4"></div>
-          <p className="text-gray-600">Loading player profile...</p>
+          <p className="text-gray-600">Loading profile...</p>
         </div>
       </div>
     )
@@ -88,7 +89,7 @@ export default function PublicPlayerProfile() {
           <div className="text-6xl mb-4">🏑</div>
           <h2 className="text-2xl font-bold text-gray-900 mb-2">Profile Not Found</h2>
           <p className="text-gray-600 mb-6">
-            {error || 'This player profile could not be found.'}
+            {error || 'Profile not found.'}
           </p>
           <button
             onClick={() => navigate(-1)}
@@ -100,6 +101,11 @@ export default function PublicPlayerProfile() {
         </div>
       </div>
     )
+  }
+
+  // Render CoachDashboard for coaches, PlayerDashboard for players
+  if (profile.role === 'coach') {
+    return <CoachDashboard profileData={profile} readOnly={true} />
   }
 
   return <PlayerDashboard profileData={profile} readOnly={true} />

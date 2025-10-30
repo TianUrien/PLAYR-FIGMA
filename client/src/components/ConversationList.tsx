@@ -12,7 +12,7 @@ interface Conversation {
     full_name: string
     username: string
     avatar_url: string | null
-    role: 'player' | 'club'
+    role: 'player' | 'coach' | 'club'
   }
   lastMessage?: {
     content: string
@@ -89,9 +89,15 @@ export default function ConversationList({
                   <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium ${
                     conversation.otherParticipant?.role === 'club'
                       ? 'bg-purple-50 text-purple-700'
+                      : conversation.otherParticipant?.role === 'coach'
+                      ? 'bg-orange-50 text-orange-700'
                       : 'bg-blue-50 text-blue-700'
                   }`}>
-                    {conversation.otherParticipant?.role === 'club' ? 'Club' : 'Player'}
+                    {conversation.otherParticipant?.role === 'club' 
+                      ? 'Club' 
+                      : conversation.otherParticipant?.role === 'coach'
+                      ? 'Coach'
+                      : 'Player'}
                   </span>
                 </div>
                 {conversation.last_message_at && (

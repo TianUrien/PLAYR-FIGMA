@@ -19,7 +19,7 @@ interface Conversation {
     full_name: string
     username: string
     avatar_url: string | null
-    role: 'player' | 'club'
+    role: 'player' | 'coach' | 'club'
   }
   lastMessage?: {
     content: string
