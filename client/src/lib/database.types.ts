@@ -242,6 +242,7 @@ export type Database = {
         Row: {
           avatar_url: string | null
           base_location: string
+          bio: string | null
           club_bio: string | null
           club_history: string | null
           contact_email: string | null
@@ -268,6 +269,7 @@ export type Database = {
         Insert: {
           avatar_url?: string | null
           base_location: string
+          bio?: string | null
           club_bio?: string | null
           club_history?: string | null
           contact_email?: string | null
@@ -294,6 +296,7 @@ export type Database = {
         Update: {
           avatar_url?: string | null
           base_location?: string
+          bio?: string | null
           club_bio?: string | null
           club_history?: string | null
           contact_email?: string | null
