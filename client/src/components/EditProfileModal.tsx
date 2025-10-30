@@ -32,7 +32,7 @@ export default function EditProfileModal({ isOpen, onClose, role }: EditProfileM
     contact_email: profile?.contact_email || '',
     club_bio: profile?.club_bio || '',
     club_history: profile?.club_history || '',
-    bio: '', // Will be populated from club_bio or player bio if needed
+    bio: profile?.bio || '',
     avatar_url: profile?.avatar_url || '',
   })
 

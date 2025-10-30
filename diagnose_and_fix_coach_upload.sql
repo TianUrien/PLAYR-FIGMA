@@ -57,13 +57,13 @@ SELECT
   full_name,
   role,
   avatar_url,
-  bio,
   base_location,
   nationality
 FROM public.profiles
 WHERE email = 'tianurien@hotmail.com';
 
 -- Expected: role = 'coach' (not 'player')
+-- Note: bio column checked separately in STEP 3
 
 
 -- STEP 5: Check RLS (Row Level Security) policies on profiles table
@@ -104,13 +104,19 @@ ADD COLUMN IF NOT EXISTS bio TEXT;
 -- FIX 3: Set up storage policies for avatars bucket
 -- =====================================================================
 
+-- Drop existing policies first (if they exist)
+DROP POLICY IF EXISTS "Public avatar access" ON storage.objects;
+DROP POLICY IF EXISTS "Authenticated users can upload avatars" ON storage.objects;
+DROP POLICY IF EXISTS "Authenticated users can update own avatars" ON storage.objects;
+DROP POLICY IF EXISTS "Authenticated users can delete own avatars" ON storage.objects;
+
 -- Allow public read access to avatars
-CREATE POLICY IF NOT EXISTS "Public avatar access"
+CREATE POLICY "Public avatar access"
 ON storage.objects FOR SELECT
 USING (bucket_id = 'avatars');
 
 -- Allow authenticated users to upload avatars
-CREATE POLICY IF NOT EXISTS "Authenticated users can upload avatars"
+CREATE POLICY "Authenticated users can upload avatars"
 ON storage.objects FOR INSERT
 TO authenticated
 WITH CHECK (
@@ -119,7 +125,7 @@ WITH CHECK (
 );
 
 -- Allow authenticated users to update their own avatars
-CREATE POLICY IF NOT EXISTS "Authenticated users can update own avatars"
+CREATE POLICY "Authenticated users can update own avatars"
 ON storage.objects FOR UPDATE
 TO authenticated
 USING (
@@ -128,7 +134,7 @@ USING (
 );
 
 -- Allow authenticated users to delete their own avatars
-CREATE POLICY IF NOT EXISTS "Authenticated users can delete own avatars"
+CREATE POLICY "Authenticated users can delete own avatars"
 ON storage.objects FOR DELETE
 TO authenticated
 USING (
@@ -151,8 +157,11 @@ AND role != 'coach';
 -- Enable RLS if not already enabled
 ALTER TABLE public.profiles ENABLE ROW LEVEL SECURITY;
 
+-- Drop existing policy first (if it exists)
+DROP POLICY IF EXISTS "Users can update their own profile" ON public.profiles;
+
 -- Allow users to update their own profile
-CREATE POLICY IF NOT EXISTS "Users can update their own profile"
+CREATE POLICY "Users can update their own profile"
 ON public.profiles
 FOR UPDATE
 TO authenticated
