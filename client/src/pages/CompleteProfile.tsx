@@ -175,7 +175,7 @@ export default function CompleteProfile() {
           league_division: formData.leagueDivision,
           website: formData.website,
           contact_email: formData.contactEmail,
-          bio: formData.clubBio,
+          club_bio: formData.clubBio,
           club_history: formData.clubHistory,
         }
       }
