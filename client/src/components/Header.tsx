@@ -15,9 +15,9 @@ export default function Header() {
   const [deleteModalOpen, setDeleteModalOpen] = useState(false)
   const dropdownRef = useRef<HTMLDivElement>(null)
 
-  // Fetch unread message count
+    // Fetch unread message count
   const fetchUnreadCount = useCallback(async () => {
-    if (!user) return
+    if (!user?.id) return
 
     try {
       // First get conversations where user is a participant
@@ -45,7 +45,7 @@ export default function Header() {
     } catch (error) {
       console.error('Error fetching unread count:', error)
     }
-  }, [user])
+  }, [user?.id]) // Only depend on user.id to prevent unnecessary recreations
 
   useEffect(() => {
     if (user) {

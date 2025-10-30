@@ -151,10 +151,14 @@ export default function ChatWindow({ conversation, currentUserId, onBack, onMess
 
     setSending(true)
     try {
+      // Generate idempotency key to prevent duplicate messages
+      const idempotencyKey = `${currentUserId}-${Date.now()}-${Math.random()}`
+      
       const { data, error } = await supabase.from('messages').insert({
         conversation_id: conversation.id,
         sender_id: currentUserId,
-        content: messageContent
+        content: messageContent,
+        idempotency_key: idempotencyKey
       }).select()
 
       if (error) throw error
