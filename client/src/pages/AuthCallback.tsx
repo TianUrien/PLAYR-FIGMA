@@ -26,7 +26,7 @@ export default function AuthCallback() {
       if (sessionEstablished) return
       sessionEstablished = true
 
-      console.log('Session established for user:', userId)
+      console.log('✅ Session established for user:', userId)
       setStatus('Loading your profile...')
 
       try {
@@ -39,92 +39,67 @@ export default function AuthCallback() {
 
         // If profile doesn't exist (PGRST116), send to CompleteProfile to create it
         if (profileError && profileError.code === 'PGRST116') {
-          console.log('Profile not found (new user), routing to /complete-profile to create it')
+          console.log('📝 Profile not found (new user), routing to /complete-profile')
           navigate('/complete-profile')
           return
         }
 
         // Other errors
         if (profileError) {
-          console.error('Error fetching profile:', profileError)
+          console.error('❌ Error fetching profile:', profileError)
           setError('Could not load your profile. Please try again or contact support.')
           return
         }
 
         if (!profile) {
-          console.error('Profile is null (unexpected)')
+          console.error('❌ Profile is null (unexpected)')
           setError('Profile not found. Please contact support.')
           return
         }
 
-        console.log('Profile found:', profile)
+        console.log('📋 Profile found:', profile)
 
         // Check if profile is complete
         if (!profile.full_name) {
-          console.log('Profile incomplete, routing to /complete-profile')
+          console.log('➡️ Profile incomplete, routing to /complete-profile')
           navigate('/complete-profile')
         } else {
-          console.log('Profile complete, routing to /dashboard')
+          console.log('➡️ Profile complete, routing to /dashboard')
           navigate('/dashboard/profile')
         }
 
       } catch (err) {
-        console.error('Error checking profile:', err)
+        console.error('💥 Error checking profile:', err)
         setError('Something went wrong. Please try again.')
       }
     }
 
-    // 🔑 PKCE CODE EXCHANGE - Check for ?code= parameter first (email verification)
+    // � Log initial state
     const queryParams = new URLSearchParams(window.location.search)
     const pkceCode = queryParams.get('code')
-    
-    if (pkceCode) {
-      console.log('🔑 PKCE code detected:', pkceCode.substring(0, 20) + '...')
-      console.log('Full URL:', window.location.href)
-      setStatus('Exchanging authorization code...')
-      
-      // Exchange code for session with proper error handling
-      supabase.auth.exchangeCodeForSession(pkceCode)
-        .then(({ data, error: exchangeError }) => {
-          if (exchangeError) {
-            console.error('❌ Code exchange failed:', exchangeError.message, exchangeError)
-            setError(`Verification failed: ${exchangeError.message}`)
-            setTimeout(() => navigate('/verify-email?error=exchange_failed'), 3000)
-            return
-          }
-          
-          if (data.session) {
-            console.log('✅ Code exchange successful, session established')
-            console.log('User ID:', data.session.user.id)
-            handleSession(data.session.user.id)
-          } else {
-            console.error('❌ No session returned after code exchange')
-            setError('No session created. Please try again.')
-            setTimeout(() => navigate('/verify-email?error=no_session'), 3000)
-          }
-        })
-        .catch((err) => {
-          console.error('💥 Unexpected error during code exchange:', err)
-          setError('An unexpected error occurred. Please try again.')
-          setTimeout(() => navigate('/verify-email?error=exchange_failed'), 3000)
-        })
-      
-      return // Exit early - code exchange will handle the rest
-    }
-
-    // Check hash for implicit flow tokens (fallback for other auth methods)
     const hash = window.location.hash
     const hashParams = new URLSearchParams(hash.substring(1))
     const hasAccessToken = hashParams.has('access_token')
     const hasError = hashParams.has('error')
     
     console.log('🔍 AuthCallback initialized')
-    console.log('URL:', window.location.href)
-    console.log('Hash:', hash)
-    console.log('Has access_token:', hasAccessToken, 'Has error:', hasError)
-    
-    // OPTION 1: Listen for auth state change (preferred)
-    // This will catch BOTH PKCE and implicit flow sessions
+    console.log('📍 Full URL:', window.location.href)
+    console.log('🔑 PKCE code present:', !!pkceCode)
+    console.log('🔑 Access token in hash:', hasAccessToken)
+    console.log('⚠️ Error in hash:', hasError)
+
+    // 🎯 STRATEGY: Let Supabase SDK handle everything via detectSessionInUrl
+    // The SDK is configured with detectSessionInUrl: true, which means it will:
+    // 1. Automatically detect ?code= parameter (PKCE flow)
+    // 2. Call exchangeCodeForSession() internally
+    // 3. Trigger onAuthStateChange with SIGNED_IN event
+    //
+    // We just need to:
+    // - Listen for SIGNED_IN event
+    // - Wait patiently for SDK to complete
+    // - Handle errors if things go wrong
+
+    // Listen for auth state changes (SDK will trigger this after processing URL)
     const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, session) => {
       console.log('🔔 Auth state change:', event, session?.user?.id)
 
@@ -133,21 +108,24 @@ export default function AuthCallback() {
       }
     })
 
-    // OPTION 2: Fallback - check for errors or manually process after delay
+    // Fallback timeout - check status after giving SDK time to process
     const timeoutId = setTimeout(async () => {
-      if (sessionEstablished) return
+      if (sessionEstablished) {
+        console.log('✅ Session already established, timeout is no-op')
+        return
+      }
 
-      console.log('⏱️ Timeout: Checking session status...')
+      console.log('⏱️ Timeout reached - checking session status...')
       
-      // First check if SDK already established a session
+      // Check if SDK already established a session (might have missed the event)
       const { data: { session } } = await supabase.auth.getSession()
       if (session) {
-        console.log('✅ Session found via getSession()')
+        console.log('✅ Session found via getSession() - SDK completed exchange')
         await handleSession(session.user.id)
         return
       }
 
-      // No session found - check if there were tokens to process
+      // No session found - check for errors or handle implicit flow
       const params = new URLSearchParams(window.location.hash.substring(1))
       const accessToken = params.get('access_token')
       const refreshToken = params.get('refresh_token')
@@ -159,9 +137,9 @@ export default function AuthCallback() {
         return
       }
       
+      // Handle implicit flow tokens (non-PKCE)
       if (accessToken && refreshToken) {
-        // Tokens exist but session not established - try manually
-        console.log('🔧 Manually setting session with hash tokens...')
+        console.log('🔧 Implicit flow tokens found, setting session manually...')
         setStatus('Establishing session...')
 
         const { data: { session }, error: sessionError } = await supabase.auth.setSession({
@@ -176,20 +154,18 @@ export default function AuthCallback() {
         }
 
         if (session) {
-          console.log('✅ Session created manually')
+          console.log('✅ Session created from implicit flow tokens')
           await handleSession(session.user.id)
           return
         }
       }
 
-      // No tokens, no session, no code - link is invalid/expired
-      if (!pkceCode && !hasAccessToken) {
-        console.error('❌ No tokens found - link expired or already used')
-        const storedEmail = localStorage.getItem('pending_email')
-        const emailParam = storedEmail ? `&email=${encodeURIComponent(storedEmail)}` : ''
-        navigate(`/verify-email?error=expired&reason=no_tokens${emailParam}`)
-      }
-    }, 3000) // Wait 3 seconds for SDK to process URL
+      // No session, no tokens, nothing worked - link is invalid/expired
+      console.error('❌ No session established - link may be expired or already used')
+      const storedEmail = localStorage.getItem('pending_email')
+      const emailParam = storedEmail ? `&email=${encodeURIComponent(storedEmail)}` : ''
+      navigate(`/verify-email?error=expired&reason=no_tokens${emailParam}`)
+    }, 5000) // Wait 5 seconds for SDK to process (increased from 3s)
 
     // Cleanup
     return () => {

@@ -33,7 +33,7 @@ export default function VerifyEmail() {
     if (error === 'expired' || error === 'invalid_token') {
       return 'expired'
     }
-    if (error === 'no_session' || error === 'session_failed') {
+    if (error === 'no_session' || error === 'session_failed' || error === 'exchange_failed') {
       return 'session_error'
     }
     if (searchParams.get('reason') === 'unverified_signin') {
@@ -70,8 +70,16 @@ export default function VerifyEmail() {
             <h1 className="text-3xl font-bold text-gray-900 mb-2">
               Verification Failed
             </h1>
+            <p className="text-gray-600 mb-2">
+              We couldn't verify your email. This usually happens when:
+            </p>
+            <ul className="text-left text-gray-600 mb-4 ml-6 list-disc space-y-1">
+              <li>The link has already been used</li>
+              <li>The link has expired (links expire after 24 hours)</li>
+              <li>You clicked the link multiple times</li>
+            </ul>
             <p className="text-gray-600 mb-6">
-              We couldn't verify your email. The link may be invalid or expired.
+              Request a new verification email below to continue.
             </p>
           </>
         )
