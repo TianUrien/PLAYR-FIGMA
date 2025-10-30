@@ -4,6 +4,8 @@ import { Menu, X, MessageCircle, LogOut, Trash2, Users, Briefcase, LayoutDashboa
 import { Avatar } from '@/components'
 import { useAuthStore } from '@/lib/auth'
 import { supabase } from '@/lib/supabase'
+import { monitor } from '@/lib/monitor'
+import { requestCache, generateCacheKey } from '@/lib/requestCache'
 import DeleteAccountModal from './DeleteAccountModal'
 
 export default function Header() {
@@ -19,32 +21,39 @@ export default function Header() {
   const fetchUnreadCount = useCallback(async () => {
     if (!user?.id) return
 
-    try {
-      // First get conversations where user is a participant
-      const { data: conversations } = await supabase
-        .from('conversations')
-        .select('id')
-        .or(`participant_one_id.eq.${user.id},participant_two_id.eq.${user.id}`)
+    const cacheKey = generateCacheKey('unread_count', { userId: user.id })
 
-      if (!conversations || conversations.length === 0) {
-        setUnreadCount(0)
-        return
-      }
+    await monitor.measure('fetch_unread_count', async () => {
+      const count = await requestCache.dedupe(
+        cacheKey,
+        async () => {
+          // First get conversations where user is a participant
+          const { data: conversations } = await supabase
+            .from('conversations')
+            .select('id')
+            .or(`participant_one_id.eq.${user.id},participant_two_id.eq.${user.id}`)
 
-      const conversationIds = conversations.map(c => c.id)
+          if (!conversations || conversations.length === 0) {
+            return 0
+          }
 
-      // Then count unread messages in those conversations
-      const { count } = await supabase
-        .from('messages')
-        .select('*', { count: 'exact', head: true })
-        .in('conversation_id', conversationIds)
-        .neq('sender_id', user.id)
-        .is('read_at', null)
+          const conversationIds = conversations.map(c => c.id)
 
-      setUnreadCount(count || 0)
-    } catch (error) {
-      console.error('Error fetching unread count:', error)
-    }
+          // Then count unread messages in those conversations
+          const { count } = await supabase
+            .from('messages')
+            .select('*', { count: 'exact', head: true })
+            .in('conversation_id', conversationIds)
+            .neq('sender_id', user.id)
+            .is('read_at', null)
+
+          return count || 0
+        },
+        10000 // Cache for 10 seconds
+      )
+
+      setUnreadCount(count)
+    }, { userId: user.id })
   }, [user?.id]) // Only depend on user.id to prevent unnecessary recreations
 
   useEffect(() => {

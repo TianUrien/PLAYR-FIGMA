@@ -2,6 +2,8 @@ import { create } from 'zustand'
 import type { User } from '@supabase/supabase-js'
 import type { Profile } from './supabase'
 import { supabase } from './supabase'
+import { requestCache, generateCacheKey } from './requestCache'
+import { monitor } from './monitor'
 
 interface AuthState {
   user: User | null
@@ -29,13 +31,25 @@ export const useAuthStore = create<AuthState>((set) => ({
   },
   
   fetchProfile: async (userId) => {
-    const { data, error } = await supabase
-      .from('profiles')
-      .select('*')
-      .eq('id', userId)
-      .single()
+    const cacheKey = generateCacheKey('profile', { id: userId })
     
-    if (!error && data) {
+    const data = await monitor.measure('fetch_profile', async () => {
+      return await requestCache.dedupe(
+        cacheKey,
+        async () => {
+          const { data, error } = await supabase
+            .from('profiles')
+            .select('*')
+            .eq('id', userId)
+            .single()
+          
+          if (error) throw error
+          return data
+        }
+      )
+    }, { userId })
+    
+    if (data) {
       set({ profile: data })
     }
   }
