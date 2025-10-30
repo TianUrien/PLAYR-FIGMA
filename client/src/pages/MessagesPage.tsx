@@ -6,6 +6,8 @@ import { useSearchParams } from 'react-router-dom'
 import ConversationList from '@/components/ConversationList'
 import ChatWindow from '@/components/ChatWindow'
 import Header from '@/components/Header'
+import { requestCache } from '@/lib/requestCache'
+import { monitor } from '@/lib/monitor'
 
 interface Conversation {
   id: string
@@ -89,61 +91,71 @@ export default function MessagesPage() {
   const fetchConversations = async () => {
     if (!user) return
 
-    try {
-      // Fetch conversations where user is a participant
-      const { data: conversationsData, error: conversationsError } = await supabase
-        .from('conversations')
-        .select('*')
-        .or(`participant_one_id.eq.${user.id},participant_two_id.eq.${user.id}`)
-        .order('last_message_at', { ascending: false, nullsFirst: false })
+    await monitor.measure('fetch_conversations', async () => {
+      const cacheKey = `conversations-${user.id}`
+      
+      try {
+        const enrichedConversations = await requestCache.dedupe(
+          cacheKey,
+          async () => {
+            // Fetch conversations where user is a participant
+            const { data: conversationsData, error: conversationsError } = await supabase
+              .from('conversations')
+              .select('*')
+              .or(`participant_one_id.eq.${user.id},participant_two_id.eq.${user.id}`)
+              .order('last_message_at', { ascending: false, nullsFirst: false })
 
-      if (conversationsError) throw conversationsError
+            if (conversationsError) throw conversationsError
 
-      // Fetch profile data and last message for each conversation
-      const enrichedConversations = await Promise.all(
-        (conversationsData || []).map(async (conv) => {
-          const otherParticipantId =
-            conv.participant_one_id === user.id ? conv.participant_two_id : conv.participant_one_id
+            // Fetch profile data and last message for each conversation
+            return await Promise.all(
+              (conversationsData || []).map(async (conv) => {
+                const otherParticipantId =
+                  conv.participant_one_id === user.id ? conv.participant_two_id : conv.participant_one_id
 
-          // Fetch other participant's profile
-          const { data: profileData } = await supabase
-            .from('profiles')
-            .select('id, full_name, username, avatar_url, role')
-            .eq('id', otherParticipantId)
-            .single()
+                // Fetch other participant's profile
+                const { data: profileData } = await supabase
+                  .from('profiles')
+                  .select('id, full_name, username, avatar_url, role')
+                  .eq('id', otherParticipantId)
+                  .single()
 
-          // Fetch last message
-          const { data: lastMessageData } = await supabase
-            .from('messages')
-            .select('content, sent_at, sender_id')
-            .eq('conversation_id', conv.id)
-            .order('sent_at', { ascending: false })
-            .limit(1)
-            .single()
+                // Fetch last message
+                const { data: lastMessageData } = await supabase
+                  .from('messages')
+                  .select('content, sent_at, sender_id')
+                  .eq('conversation_id', conv.id)
+                  .order('sent_at', { ascending: false })
+                  .limit(1)
+                  .single()
 
-          // Count unread messages
-          const { count: unreadCount } = await supabase
-            .from('messages')
-            .select('*', { count: 'exact', head: true })
-            .eq('conversation_id', conv.id)
-            .neq('sender_id', user.id)
-            .is('read_at', null)
+                // Count unread messages
+                const { count: unreadCount } = await supabase
+                  .from('messages')
+                  .select('*', { count: 'exact', head: true })
+                  .eq('conversation_id', conv.id)
+                  .neq('sender_id', user.id)
+                  .is('read_at', null)
 
-          return {
-            ...conv,
-            otherParticipant: profileData || undefined,
-            lastMessage: lastMessageData || undefined,
-            unreadCount: unreadCount || 0
-          }
-        })
-      )
+                return {
+                  ...conv,
+                  otherParticipant: profileData || undefined,
+                  lastMessage: lastMessageData || undefined,
+                  unreadCount: unreadCount || 0
+                }
+              })
+            )
+          },
+          15000 // 15 second cache for conversations
+        )
 
-      setConversations(enrichedConversations)
-    } catch (error) {
-      console.error('Error fetching conversations:', error)
-    } finally {
-      setLoading(false)
-    }
+        setConversations(enrichedConversations)
+      } catch (error) {
+        console.error('Error fetching conversations:', error)
+      } finally {
+        setLoading(false)
+      }
+    }, { userId: user.id })
   }
 
   const filteredConversations = conversations.filter((conv) =>
