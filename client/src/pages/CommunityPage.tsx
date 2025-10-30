@@ -2,6 +2,8 @@ import { useState, useEffect, useMemo, useCallback } from 'react'
 import { Search } from 'lucide-react'
 import { Header, MemberCard } from '@/components'
 import { supabase } from '@/lib/supabase'
+import { requestCache } from '@/lib/requestCache'
+import { monitor } from '@/lib/monitor'
 
 interface Profile {
   id: string
@@ -33,22 +35,33 @@ export default function CommunityPage() {
   // Fetch members from Supabase
   const fetchMembers = useCallback(async () => {
     setIsLoading(true)
-    try {
-      const { data, error } = await supabase
-        .from('profiles')
-        .select('id, avatar_url, full_name, role, nationality, base_location, position, current_club, created_at')
-        .order('created_at', { ascending: false })
-        .limit(200) // Load reasonable batch for client-side filtering
+    
+    await monitor.measure('fetch_community_members', async () => {
+      try {
+        const members = await requestCache.dedupe(
+          'community-members',
+          async () => {
+            const { data, error } = await supabase
+              .from('profiles')
+              .select('id, avatar_url, full_name, role, nationality, base_location, position, current_club, created_at')
+              .order('created_at', { ascending: false })
+              .limit(200) // Load reasonable batch for client-side filtering
 
-      if (error) throw error
-      setAllMembers((data || []) as Profile[])
-      setDisplayedMembers(((data || []) as Profile[]).slice(0, pageSize))
-      setHasMore((data || []).length > pageSize)
-    } catch (error) {
-      console.error('Error fetching members:', error)
-    } finally {
-      setIsLoading(false)
-    }
+            if (error) throw error
+            return (data || []) as Profile[]
+          },
+          30000 // 30 second cache for community members
+        )
+        
+        setAllMembers(members)
+        setDisplayedMembers(members.slice(0, pageSize))
+        setHasMore(members.length > pageSize)
+      } catch (error) {
+        console.error('Error fetching members:', error)
+      } finally {
+        setIsLoading(false)
+      }
+    })
   }, [pageSize])
 
   // Initial load
@@ -59,27 +72,40 @@ export default function CommunityPage() {
   // Perform server-side search
   const performServerSearch = useCallback(async (query: string) => {
     setIsSearching(true)
-    try {
-      const searchTerm = `%${query}%`
-      const { data, error } = await supabase
-        .from('profiles')
-        .select('id, avatar_url, full_name, role, nationality, base_location, position, current_club, created_at')
-        .or(
-          `full_name.ilike.${searchTerm},nationality.ilike.${searchTerm},base_location.ilike.${searchTerm},position.ilike.${searchTerm},current_club.ilike.${searchTerm}`
-        )
-        .order('created_at', { ascending: false })
-        .limit(200)
+    
+    await monitor.measure('search_community_members', async () => {
+      const cacheKey = `community-search-${query}`
+      
+      try {
+        const members = await requestCache.dedupe(
+          cacheKey,
+          async () => {
+            const searchTerm = `%${query}%`
+            const { data, error } = await supabase
+              .from('profiles')
+              .select('id, avatar_url, full_name, role, nationality, base_location, position, current_club, created_at')
+              .or(
+                `full_name.ilike.${searchTerm},nationality.ilike.${searchTerm},base_location.ilike.${searchTerm},position.ilike.${searchTerm},current_club.ilike.${searchTerm}`
+              )
+              .order('created_at', { ascending: false })
+              .limit(200)
 
-      if (error) throw error
-      setAllMembers((data || []) as Profile[])
-      setDisplayedMembers(((data || []) as Profile[]).slice(0, pageSize))
-      setPage(1)
-      setHasMore((data || []).length > pageSize)
-    } catch (error) {
-      console.error('Error searching members:', error)
-    } finally {
-      setIsSearching(false)
-    }
+            if (error) throw error
+            return (data || []) as Profile[]
+          },
+          20000 // 20 second cache for searches
+        )
+        
+        setAllMembers(members)
+        setDisplayedMembers(members.slice(0, pageSize))
+        setPage(1)
+        setHasMore(members.length > pageSize)
+      } catch (error) {
+        console.error('Error searching members:', error)
+      } finally {
+        setIsSearching(false)
+      }
+    }, { query })
   }, [pageSize])
 
   // Server-side search with debounce
