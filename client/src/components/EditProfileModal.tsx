@@ -15,8 +15,6 @@ export default function EditProfileModal({ isOpen, onClose, role }: EditProfileM
   const fileInputRef = useRef<HTMLInputElement>(null)
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')
-  const [uploadingImage, setUploadingImage] = useState(false)
-  const [imagePreview, setImagePreview] = useState<string | null>(profile?.avatar_url || null)
 
   const [formData, setFormData] = useState({
     full_name: profile?.full_name || '',
@@ -34,6 +32,7 @@ export default function EditProfileModal({ isOpen, onClose, role }: EditProfileM
     contact_email: profile?.contact_email || '',
     club_bio: profile?.club_bio || '',
     club_history: profile?.club_history || '',
+    bio: '', // Will be populated from club_bio or player bio if needed
     avatar_url: profile?.avatar_url || '',
   })
 
@@ -43,52 +42,31 @@ export default function EditProfileModal({ isOpen, onClose, role }: EditProfileM
     fileInputRef.current?.click()
   }
 
-  const handleImageChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0]
-    if (!file) return
-
-    // Validate file type
-    if (!file.type.startsWith('image/')) {
-      setError('Please upload an image file')
-      return
-    }
-
-    // Validate file size (max 5MB)
-    if (file.size > 5 * 1024 * 1024) {
-      setError('Image size must be less than 5MB')
-      return
-    }
-
-    setUploadingImage(true)
-    setError('')
+  const handleAvatarUpload = async (event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0];
+    if (!file || !profile) return;
 
     try {
-      // Create unique file name
-      const fileExt = file.name.split('.').pop()
-      const fileName = `${profile.id}-${Date.now()}.${fileExt}`
-      const filePath = `avatars/${fileName}`
+      const fileExt = file.name.split('.').pop();
+      const fileName = `${profile.id}-${Math.random()}.${fileExt}`;
+      const filePath = `${fileName}`;
 
-      // Upload to Supabase Storage
-      const { error: uploadError, data } = await supabase.storage
+      const { error: uploadError } = await supabase.storage
         .from('avatars')
-        .upload(filePath, file, { upsert: true })
+        .upload(filePath, file, { upsert: true });
 
-      if (uploadError) throw uploadError
+      if (uploadError) throw uploadError;
 
-      // Get public URL
       const { data: { publicUrl } } = supabase.storage
         .from('avatars')
-        .getPublicUrl(filePath)
+        .getPublicUrl(filePath);
 
-      setImagePreview(publicUrl)
-      setFormData({ ...formData, avatar_url: publicUrl })
-    } catch (err) {
-      console.error('Image upload error:', err)
-      setError(err instanceof Error ? err.message : 'Failed to upload image')
-    } finally {
-      setUploadingImage(false)
+      setFormData({ ...formData, avatar_url: publicUrl });
+    } catch (error) {
+      console.error('Error uploading avatar:', error);
+      setError('Failed to upload avatar');
     }
-  }
+  };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
@@ -113,6 +91,12 @@ export default function EditProfileModal({ isOpen, onClose, role }: EditProfileM
         updateData.current_club = formData.current_club || null
       } else if (role === 'coach') {
         updateData.nationality = formData.nationality
+        updateData.gender = formData.gender || null
+        updateData.date_of_birth = formData.date_of_birth || null
+        updateData.passport_1 = formData.passport_1 || null
+        updateData.passport_2 = formData.passport_2 || null
+        updateData.bio = formData.bio || null
+        updateData.contact_email = formData.contact_email || null
       } else if (role === 'club') {
         updateData.nationality = formData.nationality
         updateData.year_founded = formData.year_founded ? parseInt(formData.year_founded) : null
@@ -155,6 +139,8 @@ export default function EditProfileModal({ isOpen, onClose, role }: EditProfileM
           <button
             onClick={onClose}
             className="p-2 hover:bg-gray-100 rounded-lg transition-colors"
+            aria-label="Close modal"
+            title="Close"
           >
             <X className="w-5 h-5" />
           </button>
@@ -179,10 +165,8 @@ export default function EditProfileModal({ isOpen, onClose, role }: EditProfileM
                   onClick={handleImageClick}
                   className="w-24 h-24 rounded-full bg-gray-100 flex items-center justify-center cursor-pointer hover:bg-gray-200 transition-colors overflow-hidden"
                 >
-                  {uploadingImage ? (
-                    <Loader2 className="w-8 h-8 text-gray-400 animate-spin" />
-                  ) : imagePreview ? (
-                    <img src={imagePreview} alt="Preview" className="w-full h-full object-cover" />
+                  {formData.avatar_url ? (
+                    <img src={formData.avatar_url} alt="Preview" className="w-full h-full object-cover" />
                   ) : (
                     <Upload className="w-8 h-8 text-gray-400" />
                   )}
@@ -193,7 +177,7 @@ export default function EditProfileModal({ isOpen, onClose, role }: EditProfileM
                     onClick={handleImageClick}
                     className="px-4 py-2 bg-gray-100 hover:bg-gray-200 text-gray-700 rounded-lg transition-colors text-sm font-medium"
                   >
-                    {imagePreview ? 'Change Image' : 'Upload Image'}
+                    {formData.avatar_url ? 'Change Image' : 'Upload Image'}
                   </button>
                   <p className="text-xs text-gray-500 mt-1">PNG, JPG up to 5MB</p>
                 </div>
@@ -202,8 +186,9 @@ export default function EditProfileModal({ isOpen, onClose, role }: EditProfileM
                 ref={fileInputRef}
                 type="file"
                 accept="image/*"
-                onChange={handleImageChange}
+                onChange={handleAvatarUpload}
                 className="hidden"
+                aria-label="Profile picture upload"
               />
             </div>
 
@@ -234,14 +219,16 @@ export default function EditProfileModal({ isOpen, onClose, role }: EditProfileM
             {role === 'player' && (
               <>
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-2">
+                  <label className="block text-sm font-medium text-gray-700 mb-2" htmlFor="player-position">
                     Position
                   </label>
                   <select
+                    id="player-position"
                     value={formData.position}
                     onChange={(e) => setFormData({ ...formData, position: e.target.value })}
                     className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#6366f1] focus:border-transparent"
                     required
+                    aria-label="Select position"
                   >
                     <option value="">Select position</option>
                     <option value="Goalkeeper">Goalkeeper</option>
@@ -252,14 +239,16 @@ export default function EditProfileModal({ isOpen, onClose, role }: EditProfileM
                 </div>
 
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-2">
+                  <label className="block text-sm font-medium text-gray-700 mb-2" htmlFor="player-gender">
                     Gender
                   </label>
                   <select
+                    id="player-gender"
                     value={formData.gender}
                     onChange={(e) => setFormData({ ...formData, gender: e.target.value })}
                     className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#6366f1] focus:border-transparent"
                     required
+                    aria-label="Select gender"
                   >
                     <option value="">Select gender</option>
                     <option value="Men">Men</option>
@@ -301,6 +290,70 @@ export default function EditProfileModal({ isOpen, onClose, role }: EditProfileM
               </>
             )}
 
+            {/* Coach-specific fields */}
+            {role === 'coach' && (
+              <>
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2" htmlFor="coach-gender-edit">
+                    Gender
+                  </label>
+                  <select
+                    id="coach-gender-edit"
+                    value={formData.gender}
+                    onChange={(e) => setFormData({ ...formData, gender: e.target.value })}
+                    className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#6366f1] focus:border-transparent"
+                  >
+                    <option value="">Select gender</option>
+                    <option value="male">Male</option>
+                    <option value="female">Female</option>
+                    <option value="other">Other</option>
+                  </select>
+                </div>
+
+                <Input
+                  label="Date of Birth (Optional)"
+                  type="date"
+                  value={formData.date_of_birth}
+                  onChange={(e) => setFormData({ ...formData, date_of_birth: e.target.value })}
+                />
+
+                <Input
+                  label="Passport 1 (Optional)"
+                  placeholder="Primary passport/nationality"
+                  value={formData.passport_1}
+                  onChange={(e) => setFormData({ ...formData, passport_1: e.target.value })}
+                />
+
+                <Input
+                  label="Passport 2 (Optional)"
+                  placeholder="Secondary passport/nationality"
+                  value={formData.passport_2}
+                  onChange={(e) => setFormData({ ...formData, passport_2: e.target.value })}
+                />
+
+                <Input
+                  label="Contact Email (Optional)"
+                  type="email"
+                  placeholder="contact@example.com"
+                  value={formData.contact_email}
+                  onChange={(e) => setFormData({ ...formData, contact_email: e.target.value })}
+                />
+
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">
+                    Bio (Optional)
+                  </label>
+                  <textarea
+                    value={formData.bio || ''}
+                    onChange={(e) => setFormData({ ...formData, bio: e.target.value })}
+                    rows={4}
+                    className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#6366f1] focus:border-transparent resize-none"
+                    placeholder="Tell us about your coaching experience..."
+                  />
+                </div>
+              </>
+            )}
+
             {/* Club-specific fields */}
             {role === 'club' && (
               <>
@@ -331,27 +384,31 @@ export default function EditProfileModal({ isOpen, onClose, role }: EditProfileM
                   onChange={(e) => setFormData({ ...formData, contact_email: e.target.value })}
                 />
 
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-2">
-                    Club Description (Optional)
-                  </label>
-                  <textarea
-                    value={formData.club_bio}
-                    onChange={(e) => setFormData({ ...formData, club_bio: e.target.value })}
-                    className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#8b5cf6] focus:border-transparent"
-                    rows={3}
-                  />
-                </div>
-
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-2">
+              <div>
+                <label className="block text-sm font-medium text-gray-300 mb-2" htmlFor="club-bio">
+                  Bio
+                </label>
+                <textarea
+                  id="club-bio"
+                  value={formData.club_bio || ''}
+                  onChange={(e) => setFormData({ ...formData, club_bio: e.target.value })}
+                  rows={4}
+                  className="w-full px-4 py-3 bg-gray-700 text-white rounded-lg focus:ring-2 focus:ring-yellow-400 focus:outline-none resize-none"
+                  placeholder="Tell us about your club..."
+                  aria-label="Club bio"
+                />
+              </div>                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2" htmlFor="club-history">
                     Club History (Optional)
                   </label>
                   <textarea
+                    id="club-history"
                     value={formData.club_history}
                     onChange={(e) => setFormData({ ...formData, club_history: e.target.value })}
                     className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#8b5cf6] focus:border-transparent"
                     rows={3}
+                    placeholder="Tell us about your club's history..."
+                    aria-label="Club history"
                   />
                 </div>
               </>

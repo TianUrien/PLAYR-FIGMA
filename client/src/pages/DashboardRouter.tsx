@@ -2,6 +2,7 @@ import { useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { useAuthStore } from '@/lib/auth'
 import PlayerDashboard from './PlayerDashboard'
+import CoachDashboard from './CoachDashboard'
 import ClubDashboard from './ClubDashboard'
 
 export default function DashboardRouter() {
@@ -36,8 +37,12 @@ export default function DashboardRouter() {
   }
 
   // Route based on role
-  if (profile.role === 'player' || profile.role === 'coach') {
+  if (profile.role === 'player') {
     return <PlayerDashboard />
+  }
+  
+  if (profile.role === 'coach') {
+    return <CoachDashboard />
   }
   
   return <ClubDashboard />

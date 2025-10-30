@@ -35,12 +35,14 @@ export default function CompleteProfile() {
     dateOfBirth: '',
     position: '',
     gender: '',
+    passport1: '',
+    passport2: '',
     yearFounded: '',
     leagueDivision: '',
     website: '',
     contactEmail: '',
     clubBio: '',
-    clubHistory: ''
+    clubHistory: '',
   })
 
   useEffect(() => {
@@ -165,7 +167,10 @@ export default function CompleteProfile() {
       } else if (userRole === 'coach') {
         updateData = {
           ...updateData,
-          // Add coach-specific fields if needed
+          gender: formData.gender || null,
+          date_of_birth: formData.dateOfBirth || null,
+          passport_1: formData.passport1 || null,
+          passport_2: formData.passport2 || null,
         }
       } else if (userRole === 'club') {
         updateData = {
@@ -409,6 +414,48 @@ export default function CompleteProfile() {
                     value={formData.nationality}
                     onChange={(e) => setFormData({ ...formData, nationality: e.target.value })}
                     required
+                  />
+
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-2" htmlFor="coach-gender">
+                      Gender
+                    </label>
+                    <select
+                      id="coach-gender"
+                      value={formData.gender}
+                      onChange={(e) => setFormData({ ...formData, gender: e.target.value })}
+                      className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#6366f1] focus:border-transparent"
+                      required
+                    >
+                      <option value="">Select gender</option>
+                      <option value="male">Male</option>
+                      <option value="female">Female</option>
+                      <option value="other">Other</option>
+                    </select>
+                  </div>
+
+                  <Input
+                    label="Date of Birth"
+                    type="date"
+                    icon={<Calendar className="w-5 h-5" />}
+                    value={formData.dateOfBirth}
+                    onChange={(e) => setFormData({ ...formData, dateOfBirth: e.target.value })}
+                  />
+
+                  <Input
+                    label="Passport 1"
+                    icon={<Globe className="w-5 h-5" />}
+                    placeholder="Primary passport/nationality (optional)"
+                    value={formData.passport1}
+                    onChange={(e) => setFormData({ ...formData, passport1: e.target.value })}
+                  />
+
+                  <Input
+                    label="Passport 2"
+                    icon={<Globe className="w-5 h-5" />}
+                    placeholder="Secondary passport/nationality (optional)"
+                    value={formData.passport2}
+                    onChange={(e) => setFormData({ ...formData, passport2: e.target.value })}
                   />
                 </>
               )}
