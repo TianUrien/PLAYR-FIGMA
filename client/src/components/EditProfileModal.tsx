@@ -107,13 +107,29 @@ export default function EditProfileModal({ isOpen, onClose, role }: EditProfileM
         updateData.club_history = formData.club_history || null
       }
 
+      console.log('🔍 Attempting to update profile with data:', updateData)
+      console.log('🔍 Profile ID:', profile.id)
+      console.log('🔍 Role:', role)
+
       // Update profile in database
-      const { error: updateError } = await supabase
+      const { data, error: updateError } = await supabase
         .from('profiles')
         .update(updateData)
         .eq('id', profile.id)
+        .select()
 
-      if (updateError) throw updateError
+      console.log('✅ Update response data:', data)
+      console.log('❌ Update error:', updateError)
+
+      if (updateError) {
+        console.error('❌ Supabase update error details:', {
+          message: updateError.message,
+          details: updateError.details,
+          hint: updateError.hint,
+          code: updateError.code
+        })
+        throw updateError
+      }
 
       // Refresh profile in auth store
       await fetchProfile(profile.id)
@@ -121,7 +137,9 @@ export default function EditProfileModal({ isOpen, onClose, role }: EditProfileM
       // Close modal
       onClose()
     } catch (err) {
-      console.error('Profile update error:', err)
+      console.error('❌ Profile update error:', err)
+      console.error('❌ Error type:', typeof err)
+      console.error('❌ Error object:', JSON.stringify(err, null, 2))
       setError(err instanceof Error ? err.message : 'Failed to update profile')
     } finally {
       setLoading(false)
