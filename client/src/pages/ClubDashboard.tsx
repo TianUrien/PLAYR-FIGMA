@@ -157,8 +157,8 @@ export default function ClubDashboard({ profileData, readOnly = false }: ClubDas
                 )}
               </div>
 
-              <div className="inline-flex items-center gap-2 px-3 py-1 bg-purple-50 text-purple-700 rounded-full text-sm font-medium">
-                <span className="w-2 h-2 bg-purple-500 rounded-full" />
+              <div className="inline-flex items-center gap-2 px-3 py-1 bg-orange-50 text-orange-700 rounded-full text-sm font-medium">
+                <span className="w-2 h-2 bg-orange-500 rounded-full" />
                 Club
               </div>
             </div>

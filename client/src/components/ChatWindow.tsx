@@ -229,9 +229,9 @@ export default function ChatWindow({ conversation, currentUserId, onBack, onMess
           <div className="flex items-center gap-2">
             <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium ${
               conversation.otherParticipant?.role === 'club'
-                ? 'bg-purple-50 text-purple-700'
-                : conversation.otherParticipant?.role === 'coach'
                 ? 'bg-orange-50 text-orange-700'
+                : conversation.otherParticipant?.role === 'coach'
+                ? 'bg-purple-50 text-purple-700'
                 : 'bg-blue-50 text-blue-700'
             }`}>
               {conversation.otherParticipant?.role === 'club' 
