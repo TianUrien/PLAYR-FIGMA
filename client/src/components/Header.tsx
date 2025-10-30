@@ -20,17 +20,26 @@ export default function Header() {
     if (!user) return
 
     try {
+      // First get conversations where user is a participant
+      const { data: conversations } = await supabase
+        .from('conversations')
+        .select('id')
+        .or(`participant_one_id.eq.${user.id},participant_two_id.eq.${user.id}`)
+
+      if (!conversations || conversations.length === 0) {
+        setUnreadCount(0)
+        return
+      }
+
+      const conversationIds = conversations.map(c => c.id)
+
+      // Then count unread messages in those conversations
       const { count } = await supabase
         .from('messages')
         .select('*', { count: 'exact', head: true })
+        .in('conversation_id', conversationIds)
         .neq('sender_id', user.id)
         .is('read_at', null)
-        .in('conversation_id', 
-          supabase
-            .from('conversations')
-            .select('id')
-            .or(`participant_one_id.eq.${user.id},participant_two_id.eq.${user.id}`) as unknown as string[]
-        )
 
       setUnreadCount(count || 0)
     } catch (error) {
