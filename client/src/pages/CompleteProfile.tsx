@@ -152,6 +152,7 @@ export default function CompleteProfile() {
 
       // Prepare data based on role
       let updateData: Record<string, unknown> = {
+        role: userRole, // IMPORTANT: Always include role in update
         full_name: formData.fullName || formData.clubName,
         base_location: formData.city,
         nationality: formData.nationality,
