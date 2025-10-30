@@ -150,7 +150,7 @@ export default function CompleteProfile() {
       // Prepare data based on role
       let updateData: Record<string, unknown> = {
         full_name: formData.fullName || formData.clubName,
-        city: formData.city,
+        base_location: formData.city,
         nationality: formData.nationality,
       }
 
@@ -170,6 +170,7 @@ export default function CompleteProfile() {
         updateData = {
           ...updateData,
           full_name: formData.clubName,
+          base_location: formData.city, // City is stored in base_location
           country: formData.country,
           year_founded: formData.yearFounded ? parseInt(formData.yearFounded) : null,
           league_division: formData.leagueDivision,
