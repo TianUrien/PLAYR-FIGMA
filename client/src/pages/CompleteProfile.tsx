@@ -171,7 +171,7 @@ export default function CompleteProfile() {
           ...updateData,
           full_name: formData.clubName,
           base_location: formData.city, // City is stored in base_location
-          country: formData.country,
+          // Note: country field is not in profiles table, using nationality instead
           year_founded: formData.yearFounded ? parseInt(formData.yearFounded) : null,
           league_division: formData.leagueDivision,
           website: formData.website,
