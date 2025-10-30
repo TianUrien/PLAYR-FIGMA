@@ -7,6 +7,8 @@ import Header from '../components/Header'
 import VacancyCard from '../components/VacancyCard'
 import ApplyToVacancyModal from '../components/ApplyToVacancyModal'
 import Button from '../components/Button'
+import { requestCache } from '@/lib/requestCache'
+import { monitor } from '@/lib/monitor'
 
 interface FiltersState {
   opportunityType: 'all' | 'player' | 'coach'
@@ -48,68 +50,92 @@ export default function OpportunitiesPage() {
 
   const fetchVacancies = useCallback(async () => {
     setIsLoading(true)
-    try {
-      // Fetch all open vacancies
-      const { data: vacanciesData, error: vacanciesError } = await supabase
-        .from('vacancies')
-        .select('*')
-        .eq('status', 'open')
-        .order('created_at', { ascending: false })
+    
+    await monitor.measure('fetch_vacancies', async () => {
+      try {
+        const { vacanciesData, clubsMap } = await requestCache.dedupe(
+          'open-vacancies',
+          async () => {
+            // Fetch all open vacancies
+            const { data: vacanciesData, error: vacanciesError } = await supabase
+              .from('vacancies')
+              .select('*')
+              .eq('status', 'open')
+              .order('created_at', { ascending: false })
 
-      if (vacanciesError) throw vacanciesError
+            if (vacanciesError) throw vacanciesError
 
-      console.log('Fetched vacancies:', vacanciesData)
-      setVacancies((vacanciesData as Vacancy[]) || [])
+            console.log('Fetched vacancies:', vacanciesData)
 
-      // Fetch club details
-      if (vacanciesData && vacanciesData.length > 0) {
-        const clubIds = [...new Set(vacanciesData.map((v: Vacancy) => v.club_id))]
-        console.log('Fetching clubs for IDs:', clubIds)
-        
-        const { data: clubsData, error: clubsError } = await supabase
-          .from('profiles')
-          .select('id, full_name, avatar_url')
-          .in('id', clubIds)
+            // Fetch club details
+            let clubsMap: Record<string, { id: string; full_name: string; avatar_url: string | null }> = {}
+            
+            if (vacanciesData && vacanciesData.length > 0) {
+              const clubIds = [...new Set(vacanciesData.map((v: Vacancy) => v.club_id))]
+              console.log('Fetching clubs for IDs:', clubIds)
+              
+              const { data: clubsData, error: clubsError } = await supabase
+                .from('profiles')
+                .select('id, full_name, avatar_url')
+                .in('id', clubIds)
 
-        if (clubsError) {
-          console.error('Error fetching clubs:', clubsError)
-          throw clubsError
-        }
+              if (clubsError) {
+                console.error('Error fetching clubs:', clubsError)
+                throw clubsError
+              }
 
-        console.log('Fetched clubs:', clubsData)
+              console.log('Fetched clubs:', clubsData)
 
-        const clubsMap: Record<string, { id: string; full_name: string; avatar_url: string | null }> = {}
-        clubsData?.forEach((club: { id: string; full_name: string; avatar_url: string | null }) => {
-          clubsMap[club.id] = club
-        })
+              clubsData?.forEach((club: { id: string; full_name: string; avatar_url: string | null }) => {
+                clubsMap[club.id] = club
+              })
+              console.log('Clubs map:', clubsMap)
+            }
+
+            return { vacanciesData, clubsMap }
+          },
+          20000 // 20 second cache for vacancies
+        )
+
+        setVacancies((vacanciesData as Vacancy[]) || [])
         setClubs(clubsMap)
-        console.log('Clubs map:', clubsMap)
+      } catch (error) {
+        console.error('Error fetching vacancies:', error)
+      } finally {
+        setIsLoading(false)
       }
-    } catch (error) {
-      console.error('Error fetching vacancies:', error)
-    } finally {
-      setIsLoading(false)
-    }
+    })
   }, [])
 
   const fetchUserApplications = useCallback(async () => {
     if (!user || profile?.role !== 'player') return
 
-    try {
-      const { data, error } = await supabase
-        .from('vacancy_applications')
-        .select('vacancy_id')
-        .eq('player_id', user.id)
+    await monitor.measure('fetch_user_applications', async () => {
+      const cacheKey = `user-applications-${user.id}`
+      
+      try {
+        const appliedVacancyIds = await requestCache.dedupe(
+          cacheKey,
+          async () => {
+            const { data, error } = await supabase
+              .from('vacancy_applications')
+              .select('vacancy_id')
+              .eq('player_id', user.id)
 
-      if (error) throw error
+            if (error) throw error
 
-      const appliedVacancyIds = new Set(
-        (data as { vacancy_id: string }[])?.map(app => app.vacancy_id) || []
-      )
-      setUserApplications(appliedVacancyIds)
-    } catch (error) {
-      console.error('Error fetching user applications:', error)
-    }
+            return new Set(
+              (data as { vacancy_id: string }[])?.map(app => app.vacancy_id) || []
+            )
+          },
+          30000 // 30 second cache for applications
+        )
+        
+        setUserApplications(appliedVacancyIds)
+      } catch (error) {
+        console.error('Error fetching user applications:', error)
+      }
+    }, { userId: user.id })
   }, [user, profile])
 
   useEffect(() => {
