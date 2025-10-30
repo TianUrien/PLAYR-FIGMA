@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom'
 import { User, MapPin, Globe, Calendar, Building2 } from 'lucide-react'
 import { Input, Button } from '@/components'
 import { supabase } from '@/lib/supabase'
+import { useAuthStore } from '@/lib/auth'
 
 type UserRole = 'player' | 'coach' | 'club'
 
@@ -194,10 +195,32 @@ export default function CompleteProfile() {
         throw new Error(`Failed to update profile: ${updateError.message}`)
       }
 
-      console.log('Profile updated successfully, redirecting to dashboard')
+      console.log('Profile updated successfully')
 
-      // Success - redirect to dashboard
-      navigate('/dashboard/profile')
+      // Fetch the updated profile to verify
+      const { data: updatedProfile, error: fetchError } = await supabase
+        .from('profiles')
+        .select('*')
+        .eq('id', userId)
+        .single()
+
+      if (fetchError || !updatedProfile) {
+        console.error('Error fetching updated profile:', fetchError)
+        throw new Error('Profile updated but could not verify. Please refresh the page.')
+      }
+
+      console.log('Updated profile verified:', updatedProfile)
+
+      // Refresh the auth store with the updated profile
+      const { fetchProfile } = useAuthStore.getState()
+      await fetchProfile(userId)
+      
+      console.log('Auth store refreshed with updated profile')
+
+      // Redirect to dashboard with role-specific route
+      const dashboardRoute = updatedProfile.role === 'club' ? '/dashboard/profile' : '/dashboard/profile'
+      console.log('Redirecting to:', dashboardRoute)
+      navigate(dashboardRoute)
 
     } catch (err) {
       console.error('Complete profile error:', err)
