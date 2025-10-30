@@ -2,6 +2,7 @@ import { useState, useEffect, useRef } from 'react'
 import { Send, ArrowLeft, Circle } from 'lucide-react'
 import { supabase } from '@/lib/supabase'
 import { format } from 'date-fns'
+import { monitor } from '@/lib/monitor'
 
 interface Message {
   id: string
@@ -150,34 +151,40 @@ export default function ChatWindow({ conversation, currentUserId, onBack, onMess
     }
 
     setSending(true)
-    try {
-      // Generate idempotency key to prevent duplicate messages
-      const idempotencyKey = `${currentUserId}-${Date.now()}-${Math.random()}`
-      
-      const { data, error } = await supabase.from('messages').insert({
-        conversation_id: conversation.id,
-        sender_id: currentUserId,
-        content: messageContent,
-        idempotency_key: idempotencyKey
-      }).select()
+    
+    await monitor.measure('send_message', async () => {
+      try {
+        // Generate idempotency key to prevent duplicate messages
+        const idempotencyKey = `${currentUserId}-${Date.now()}-${Math.random()}`
+        
+        const { data, error } = await supabase.from('messages').insert({
+          conversation_id: conversation.id,
+          sender_id: currentUserId,
+          content: messageContent,
+          idempotency_key: idempotencyKey
+        }).select()
 
-      if (error) throw error
+        if (error) throw error
 
-      // Immediately add the message to local state for instant feedback
-      if (data && data[0]) {
-        console.log('Message sent, adding to local state:', data[0])
-        setMessages(prev => [...prev, data[0]])
+        // Immediately add the message to local state for instant feedback
+        if (data && data[0]) {
+          console.log('Message sent, adding to local state:', data[0])
+          setMessages(prev => [...prev, data[0]])
+        }
+
+        setNewMessage('')
+        inputRef.current?.focus()
+        onMessageSent()
+      } catch (error) {
+        console.error('Error sending message:', error)
+        alert('Failed to send message. Please try again.')
+        throw error
       }
-
-      setNewMessage('')
-      inputRef.current?.focus()
-      onMessageSent()
-    } catch (error) {
-      console.error('Error sending message:', error)
-      alert('Failed to send message. Please try again.')
-    } finally {
+    }, {
+      conversationId: conversation.id
+    }).finally(() => {
       setSending(false)
-    }
+    })
   }
 
   const handleKeyDown = (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
