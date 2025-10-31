@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef } from 'react'
-import { Send, ArrowLeft, Circle } from 'lucide-react'
+import { Send, ArrowLeft } from 'lucide-react'
 import { supabase } from '@/lib/supabase'
 import { format } from 'date-fns'
 import { monitor } from '@/lib/monitor'
@@ -48,6 +48,7 @@ export default function ChatWindow({ conversation, currentUserId, onBack, onMess
       fetchMessages()
       markMessagesAsRead()
     }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [conversation.id])
 
   // Set up real-time subscription for new messages in this conversation
@@ -98,6 +99,7 @@ export default function ChatWindow({ conversation, currentUserId, onBack, onMess
     return () => {
       supabase.removeChannel(channel)
     }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [conversation.id, currentUserId])
 
   // Auto-scroll to bottom when new messages arrive
@@ -218,7 +220,8 @@ export default function ChatWindow({ conversation, currentUserId, onBack, onMess
   const handleKeyDown = (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
     if (e.key === 'Enter' && !e.shiftKey) {
       e.preventDefault()
-      handleSendMessage(e as any)
+      const syntheticEvent = e as unknown as React.FormEvent
+      handleSendMessage(syntheticEvent)
     }
   }
 

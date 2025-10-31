@@ -79,6 +79,7 @@ export default function MediaTab({ profileId, readOnly = false }: MediaTabProps)
     if (targetUserId) {
       fetchGalleryPhotos()
     }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [targetUserId])
 
   const handlePhotoUpload = async (event: React.ChangeEvent<HTMLInputElement>) => {
@@ -128,7 +129,7 @@ export default function MediaTab({ profileId, readOnly = false }: MediaTabProps)
           .insert({
             user_id: user.id,
             photo_url: urlData.publicUrl
-          } as any)
+          })
 
         if (dbError) throw dbError
       }
@@ -184,7 +185,7 @@ export default function MediaTab({ profileId, readOnly = false }: MediaTabProps)
     try {
       const { error } = await supabase
         .from('profiles')
-        .update({ highlight_video_url: null } as any)
+        .update({ highlight_video_url: null })
         .eq('id', user.id)
 
       if (error) throw error

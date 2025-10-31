@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useCallback } from 'react'
 import { Search, MessageCircle } from 'lucide-react'
 import { useAuthStore } from '@/lib/auth'
 import { supabase } from '@/lib/supabase'
@@ -53,6 +53,7 @@ export default function MessagesPage() {
     if (user) {
       fetchConversations()
     }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [user])
 
   // Set up real-time subscription for new messages
@@ -88,9 +89,10 @@ export default function MessagesPage() {
     return () => {
       supabase.removeChannel(channel)
     }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [user])
 
-  const fetchConversations = async () => {
+  const fetchConversations = useCallback(async () => {
     if (!user) return
 
     await monitor.measure('fetch_conversations', async () => {
@@ -199,7 +201,7 @@ export default function MessagesPage() {
         setLoading(false)
       }
     }, { userId: user.id })
-  }
+  }, [user])
 
   const filteredConversations = conversations.filter((conv) =>
     conv.otherParticipant?.full_name.toLowerCase().includes(searchQuery.toLowerCase())
