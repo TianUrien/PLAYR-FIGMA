@@ -9,6 +9,7 @@ import Header from '@/components/Header'
 import { requestCache } from '@/lib/requestCache'
 import { monitor } from '@/lib/monitor'
 import { logger } from '@/lib/logger'
+import { withRetry } from '@/lib/retry'
 
 interface Conversation {
   id: string
@@ -99,13 +100,18 @@ export default function MessagesPage() {
         const enrichedConversations = await requestCache.dedupe(
           cacheKey,
           async () => {
-            // Fetch conversations where user is a participant
-            const { data: conversationsData, error: conversationsError } = await supabase
-              .from('conversations')
-              .select('*')
-              .or(`participant_one_id.eq.${user.id},participant_two_id.eq.${user.id}`)
-              .order('last_message_at', { ascending: false, nullsFirst: false })
+            // Fetch conversations where user is a participant - with retry
+            const conversationsResult = await withRetry(async () => {
+              const result = await supabase
+                .from('conversations')
+                .select('*')
+                .or(`participant_one_id.eq.${user.id},participant_two_id.eq.${user.id}`)
+                .order('last_message_at', { ascending: false, nullsFirst: false })
+              if (result.error) throw result.error
+              return result
+            })
 
+            const { data: conversationsData, error: conversationsError } = conversationsResult
             if (conversationsError) throw conversationsError
             if (!conversationsData || conversationsData.length === 0) return []
 
@@ -114,11 +120,16 @@ export default function MessagesPage() {
               conv.participant_one_id === user.id ? conv.participant_two_id : conv.participant_one_id
             )
 
-            // Batch fetch all profiles in a single query
-            const { data: profilesData } = await supabase
-              .from('profiles')
-              .select('id, full_name, username, avatar_url, role')
-              .in('id', otherParticipantIds)
+            // Batch fetch all profiles in a single query - with retry
+            const profilesResult = await withRetry(async () => {
+              const result = await supabase
+                .from('profiles')
+                .select('id, full_name, username, avatar_url, role')
+                .in('id', otherParticipantIds)
+              if (result.error) throw result.error
+              return result
+            })
+            const { data: profilesData } = profilesResult
 
             // Create a map for fast lookup
             const profilesMap = new Map(

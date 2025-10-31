@@ -3,6 +3,8 @@
  * Automatically retries failed requests with exponential backoff
  */
 
+import { logger } from './logger'
+
 interface RetryOptions {
   maxRetries?: number;
   baseDelay?: number;
@@ -16,8 +18,28 @@ const DEFAULT_OPTIONS: Required<RetryOptions> = {
   baseDelay: 1000, // 1 second
   maxDelay: 10000, // 10 seconds
   shouldRetry: (error: Error) => {
-    // Retry on network errors or 5xx server errors
+    // Retry on network errors, 5xx server errors, or Supabase specific errors
     const message = error.message.toLowerCase();
+    
+    // Check for Supabase/PostgreSQL error codes
+    const errorObj = error as { code?: string; status?: number }
+    if (errorObj.code) {
+      const retryableCodes = [
+        'PGRST504', // Gateway timeout
+        'PGRST503', // Service unavailable
+        '57014', // Query cancelled
+        '53300', // Too many connections
+        '08006', // Connection failure
+      ]
+      if (retryableCodes.includes(errorObj.code)) return true
+    }
+    
+    // Check for HTTP 5xx status codes
+    if (errorObj.status && errorObj.status >= 500 && errorObj.status < 600) {
+      return true
+    }
+    
+    // Check error message for common transient issues
     return (
       message.includes('network') ||
       message.includes('fetch') ||
@@ -25,11 +47,12 @@ const DEFAULT_OPTIONS: Required<RetryOptions> = {
       message.includes('500') ||
       message.includes('502') ||
       message.includes('503') ||
-      message.includes('504')
+      message.includes('504') ||
+      message.includes('rate limit')
     );
   },
   onRetry: (error: Error, attempt: number) => {
-    console.log(`Retry attempt ${attempt} after error:`, error.message);
+    logger.warn(`Retry attempt ${attempt} after error:`, error.message);
   },
 };
 

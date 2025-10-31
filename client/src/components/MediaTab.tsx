@@ -5,6 +5,8 @@ import { useAuthStore } from '../lib/auth'
 import type { GalleryPhoto, Profile } from '../lib/database.types'
 import Button from './Button'
 import AddVideoLinkModal from './AddVideoLinkModal'
+import { optimizeImage, validateImage } from '@/lib/imageOptimization'
+import { logger } from '@/lib/logger'
 
 interface MediaTabProps {
   profileId?: string
@@ -89,24 +91,29 @@ export default function MediaTab({ profileId, readOnly = false }: MediaTabProps)
       // Upload all selected files
       for (const file of Array.from(files)) {
         // Validate file
-        if (!file.type.startsWith('image/')) {
-          alert(`${file.name} is not an image file`)
+        const validation = validateImage(file)
+        if (!validation.valid) {
+          alert(`${file.name}: ${validation.error}`)
           continue
         }
 
-        if (file.size > 5 * 1024 * 1024) {
-          alert(`${file.name} is too large. Max size is 5MB`)
-          continue
-        }
+        // Optimize image before upload
+        logger.debug(`Optimizing ${file.name}...`)
+        const optimizedFile = await optimizeImage(file, {
+          maxWidth: 1200,
+          maxHeight: 1200,
+          maxSizeMB: 1, // 1MB max for gallery photos
+          quality: 0.85
+        })
 
         // Create unique filename
-        const fileExt = file.name.split('.').pop()
+        const fileExt = optimizedFile.name.split('.').pop()
         const fileName = `${user.id}/${Date.now()}_${Math.random().toString(36).substring(7)}.${fileExt}`
 
         // Upload to storage
         const { error: uploadError } = await supabase.storage
           .from('gallery')
-          .upload(fileName, file)
+          .upload(fileName, optimizedFile)
 
         if (uploadError) throw uploadError
 
@@ -128,8 +135,9 @@ export default function MediaTab({ profileId, readOnly = false }: MediaTabProps)
 
       // Refresh gallery
       await fetchGalleryPhotos()
+      logger.info(`Successfully uploaded ${files.length} photo(s)`)
     } catch (error) {
-      console.error('Error uploading photos:', error)
+      logger.error('Error uploading photos:', error)
       alert('Failed to upload photos. Please try again.')
     } finally {
       setIsUploading(false)

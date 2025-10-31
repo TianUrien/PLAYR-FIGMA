@@ -3,6 +3,8 @@
  * Tracks API performance and user experience metrics
  */
 
+import { logger } from './logger'
+
 interface PerformanceMetric {
   name: string;
   duration: number;
@@ -10,6 +12,16 @@ interface PerformanceMetric {
   success: boolean;
   error?: string;
   tags?: Record<string, string>;
+}
+
+interface ErrorReport {
+  message: string;
+  stack?: string;
+  timestamp: number;
+  context?: Record<string, unknown>;
+  userAgent?: string;
+  url?: string;
+  userId?: string;
 }
 
 interface PerformanceStats {
@@ -25,7 +37,9 @@ interface PerformanceStats {
 
 class PerformanceMonitor {
   private metrics: PerformanceMetric[] = [];
+  private errors: ErrorReport[] = [];
   private readonly MAX_METRICS = 1000;
+  private readonly MAX_ERRORS = 100;
   private readonly SLOW_THRESHOLD = 1000; // 1 second
 
   /**
@@ -235,6 +249,89 @@ class PerformanceMonitor {
       slowOperations,
     };
   }
+
+  /**
+   * Track an error with context
+   */
+  trackError(error: Error | string, context?: Record<string, unknown>, userId?: string) {
+    const errorReport: ErrorReport = {
+      message: error instanceof Error ? error.message : error,
+      stack: error instanceof Error ? error.stack : undefined,
+      timestamp: Date.now(),
+      context,
+      userAgent: typeof window !== 'undefined' ? window.navigator.userAgent : undefined,
+      url: typeof window !== 'undefined' ? window.location.href : undefined,
+      userId,
+    };
+
+    this.errors.push(errorReport);
+
+    // Keep only recent errors
+    if (this.errors.length > this.MAX_ERRORS) {
+      this.errors.shift();
+    }
+
+    // Log error
+    logger.error('Error tracked:', {
+      message: errorReport.message,
+      context,
+      userId,
+      url: errorReport.url,
+    });
+  }
+
+  /**
+   * Get recent errors
+   */
+  getErrors(limit = 20): ErrorReport[] {
+    return this.errors
+      .slice()
+      .reverse()
+      .slice(0, limit);
+  }
+
+  /**
+   * Get error rate over time
+   */
+  getErrorRate(timeWindowMs = 60000): number {
+    const now = Date.now();
+    const recentErrors = this.errors.filter(e => now - e.timestamp < timeWindowMs);
+    const recentMetrics = this.metrics.filter(m => now - m.timestamp < timeWindowMs);
+    
+    if (recentMetrics.length === 0) return 0;
+    return (recentErrors.length / recentMetrics.length) * 100;
+  }
+
+  /**
+   * Clear all errors
+   */
+  clearErrors() {
+    this.errors = [];
+  }
+
+  /**
+   * Log error summary to console
+   */
+  logErrors(limit = 10) {
+    const errors = this.getErrors(limit);
+    if (errors.length === 0) {
+      console.log('No errors tracked');
+      return;
+    }
+
+    console.group(`🚨 Recent Errors (${errors.length})`);
+    errors.forEach((err, idx) => {
+      const ago = ((Date.now() - err.timestamp) / 1000).toFixed(0);
+      console.log(`${idx + 1}. [${ago}s ago] ${err.message}`);
+      if (err.context) {
+        console.log('   Context:', err.context);
+      }
+      if (err.stack) {
+        console.log('   Stack:', err.stack);
+      }
+    });
+    console.groupEnd();
+  }
 }
 
 export const monitor = new PerformanceMonitor();
@@ -294,13 +391,25 @@ export function initWebVitals() {
  *   { userId, source: 'dashboard' }
  * );
  * 
+ * // Track errors
+ * try {
+ *   await riskyOperation()
+ * } catch (error) {
+ *   monitor.trackError(error, { operation: 'riskyOperation', userId }, userId)
+ * }
+ * 
  * // View stats in console
  * monitor.logStats('fetch_profile');
  * monitor.logAllStats();
+ * monitor.logErrors();
  * 
  * // Check health
  * const health = monitor.getHealthStatus();
  * console.log('System health:', health);
+ * 
+ * // Get error rate
+ * const errorRate = monitor.getErrorRate(); // Last 60s
+ * console.log(`Error rate: ${errorRate.toFixed(2)}%`);
  * 
  * // Initialize Web Vitals tracking (call once in main.tsx)
  * initWebVitals();

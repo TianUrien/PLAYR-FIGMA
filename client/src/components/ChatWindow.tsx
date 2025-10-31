@@ -4,6 +4,7 @@ import { supabase } from '@/lib/supabase'
 import { format } from 'date-fns'
 import { monitor } from '@/lib/monitor'
 import { logger } from '@/lib/logger'
+import { withRetry } from '@/lib/retry'
 
 interface Message {
   id: string
@@ -153,31 +154,57 @@ export default function ChatWindow({ conversation, currentUserId, onBack, onMess
 
     setSending(true)
     
+    // Generate idempotency key and optimistic message ID
+    const idempotencyKey = `${currentUserId}-${Date.now()}-${Math.random()}`
+    const optimisticId = `optimistic-${idempotencyKey}`
+    
+    // Create optimistic message for immediate UI feedback
+    const optimisticMessage: Message = {
+      id: optimisticId,
+      conversation_id: conversation.id,
+      sender_id: currentUserId,
+      content: messageContent,
+      sent_at: new Date().toISOString(),
+      read_at: null
+    }
+    
+    // Add optimistic message immediately
+    setMessages(prev => [...prev, optimisticMessage])
+    setNewMessage('')
+    inputRef.current?.focus()
+    
     await monitor.measure('send_message', async () => {
       try {
-        // Generate idempotency key to prevent duplicate messages
-        const idempotencyKey = `${currentUserId}-${Date.now()}-${Math.random()}`
-        
-        const { data, error } = await supabase.from('messages').insert({
-          conversation_id: conversation.id,
-          sender_id: currentUserId,
-          content: messageContent,
-          idempotency_key: idempotencyKey
-        }).select()
+        // Send message with retry logic
+        const result = await withRetry(async () => {
+          const res = await supabase.from('messages').insert({
+            conversation_id: conversation.id,
+            sender_id: currentUserId,
+            content: messageContent,
+            idempotency_key: idempotencyKey
+          }).select()
+          if (res.error) throw res.error
+          return res
+        })
 
+        const { data, error } = result
         if (error) throw error
 
-        // Immediately add the message to local state for instant feedback
+        // Replace optimistic message with real message from server
         if (data && data[0]) {
-          logger.debug('Message sent, adding to local state:', data[0])
-          setMessages(prev => [...prev, data[0]])
+          logger.debug('Message sent successfully, replacing optimistic message')
+          setMessages(prev => prev.map(msg => 
+            msg.id === optimisticId ? data[0] : msg
+          ))
         }
 
-        setNewMessage('')
-        inputRef.current?.focus()
         onMessageSent()
       } catch (error) {
         logger.error('Error sending message:', error)
+        // Remove optimistic message on failure
+        setMessages(prev => prev.filter(msg => msg.id !== optimisticId))
+        // Restore the message content so user can retry
+        setNewMessage(messageContent)
         alert('Failed to send message. Please try again.')
         throw error
       }

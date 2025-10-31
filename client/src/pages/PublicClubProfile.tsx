@@ -4,6 +4,8 @@ import { ArrowLeft } from 'lucide-react'
 import { supabase } from '../lib/supabase'
 import type { Profile } from '../lib/database.types'
 import ClubDashboard from './ClubDashboard'
+import { requestCache } from '@/lib/requestCache'
+import { monitor } from '@/lib/monitor'
 
 export default function PublicClubProfile() {
   const { username, id } = useParams<{ username?: string; id?: string }>()

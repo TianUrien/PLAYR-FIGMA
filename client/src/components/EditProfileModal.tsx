@@ -1,9 +1,11 @@
-import { useState, useRef } from 'react'
-import { X, Upload, Loader2 } from 'lucide-react'
+import { useState, useEffect, useRef } from 'react'
+import { X, Camera, MapPin, Globe, Linkedin, Instagram, Twitter, Calendar, Trophy, User } from 'lucide-react'
 import { supabase } from '@/lib/supabase'
-import { useAuthStore } from '@/lib/auth'
-import { Button, Input } from '@/components'
+import type { Profile } from '@/lib/database.types'
+import CountrySelector from './CountrySelector'
+import { Avatar } from './index'
 import { logger } from '@/lib/logger'
+import { optimizeImage, validateImage } from '@/lib/imageOptimization'
 
 interface EditProfileModalProps {
   isOpen: boolean
@@ -48,13 +50,29 @@ export default function EditProfileModal({ isOpen, onClose, role }: EditProfileM
     if (!file || !profile) return;
 
     try {
-      const fileExt = file.name.split('.').pop();
+      // Validate image
+      const validation = validateImage(file);
+      if (!validation.valid) {
+        setError(validation.error || 'Invalid image');
+        return;
+      }
+
+      // Optimize image before upload
+      logger.debug('Optimizing avatar image...')
+      const optimizedFile = await optimizeImage(file, {
+        maxWidth: 800, // Avatars don't need to be huge
+        maxHeight: 800,
+        maxSizeMB: 0.5, // 500KB max for avatars
+        quality: 0.85
+      });
+
+      const fileExt = optimizedFile.name.split('.').pop();
       const fileName = `${profile.id}-${Math.random()}.${fileExt}`;
       const filePath = `${fileName}`;
 
       const { error: uploadError } = await supabase.storage
         .from('avatars')
-        .upload(filePath, file, { upsert: true });
+        .upload(filePath, optimizedFile, { upsert: true });
 
       if (uploadError) throw uploadError;
 
@@ -63,6 +81,7 @@ export default function EditProfileModal({ isOpen, onClose, role }: EditProfileM
         .getPublicUrl(filePath);
 
       setFormData({ ...formData, avatar_url: publicUrl });
+      logger.info('Avatar uploaded successfully')
     } catch (error) {
       logger.error('Error uploading avatar:', error);
       setError('Failed to upload avatar');
