@@ -19,7 +19,7 @@ interface Conversation {
   otherParticipant?: {
     id: string
     full_name: string
-    username: string
+    username: string | null
     avatar_url: string | null
     role: 'player' | 'coach' | 'club'
   }
@@ -139,7 +139,10 @@ export default function MessagesPage() {
 
                 return {
                   ...conv,
-                  otherParticipant: profileData || undefined,
+                  otherParticipant: profileData ? {
+                    ...profileData,
+                    role: profileData.role as 'player' | 'coach' | 'club'
+                  } : undefined,
                   lastMessage: lastMessageData || undefined,
                   unreadCount: unreadCount || 0
                 }

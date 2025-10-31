@@ -20,7 +20,7 @@ interface Conversation {
   otherParticipant?: {
     id: string
     full_name: string
-    username: string
+    username: string | null
     avatar_url: string | null
     role: 'player' | 'coach' | 'club'
   }

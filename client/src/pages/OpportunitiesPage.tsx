@@ -183,7 +183,7 @@ export default function OpportunitiesPage() {
     // Benefits filter
     if (filters.benefits.length > 0) {
       filtered = filtered.filter(v =>
-        filters.benefits.some(benefit => v.benefits.includes(benefit))
+        v.benefits && filters.benefits.some(benefit => v.benefits?.includes(benefit))
       )
     }
 
@@ -194,7 +194,11 @@ export default function OpportunitiesPage() {
 
     // Sort
     if (sortBy === 'newest') {
-      filtered.sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime())
+      filtered.sort((a, b) => {
+        const dateA = a.created_at ? new Date(a.created_at).getTime() : 0
+        const dateB = b.created_at ? new Date(b.created_at).getTime() : 0
+        return dateB - dateA
+      })
     }
 
     setFilteredVacancies(filtered)
