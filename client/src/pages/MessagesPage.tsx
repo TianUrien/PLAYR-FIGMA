@@ -8,6 +8,7 @@ import ChatWindow from '@/components/ChatWindow'
 import Header from '@/components/Header'
 import { requestCache } from '@/lib/requestCache'
 import { monitor } from '@/lib/monitor'
+import { logger } from '@/lib/logger'
 
 interface Conversation {
   id: string
@@ -106,55 +107,83 @@ export default function MessagesPage() {
               .order('last_message_at', { ascending: false, nullsFirst: false })
 
             if (conversationsError) throw conversationsError
+            if (!conversationsData || conversationsData.length === 0) return []
 
-            // Fetch profile data and last message for each conversation
-            return await Promise.all(
-              (conversationsData || []).map(async (conv) => {
-                const otherParticipantId =
-                  conv.participant_one_id === user.id ? conv.participant_two_id : conv.participant_one_id
-
-                // Fetch other participant's profile
-                const { data: profileData } = await supabase
-                  .from('profiles')
-                  .select('id, full_name, username, avatar_url, role')
-                  .eq('id', otherParticipantId)
-                  .single()
-
-                // Fetch last message
-                const { data: lastMessageData } = await supabase
-                  .from('messages')
-                  .select('content, sent_at, sender_id')
-                  .eq('conversation_id', conv.id)
-                  .order('sent_at', { ascending: false })
-                  .limit(1)
-                  .single()
-
-                // Count unread messages
-                const { count: unreadCount } = await supabase
-                  .from('messages')
-                  .select('*', { count: 'exact', head: true })
-                  .eq('conversation_id', conv.id)
-                  .neq('sender_id', user.id)
-                  .is('read_at', null)
-
-                return {
-                  ...conv,
-                  otherParticipant: profileData ? {
-                    ...profileData,
-                    role: profileData.role as 'player' | 'coach' | 'club'
-                  } : undefined,
-                  lastMessage: lastMessageData || undefined,
-                  unreadCount: unreadCount || 0
-                }
-              })
+            // Extract all participant IDs (not the current user)
+            const otherParticipantIds = conversationsData.map(conv => 
+              conv.participant_one_id === user.id ? conv.participant_two_id : conv.participant_one_id
             )
+
+            // Batch fetch all profiles in a single query
+            const { data: profilesData } = await supabase
+              .from('profiles')
+              .select('id, full_name, username, avatar_url, role')
+              .in('id', otherParticipantIds)
+
+            // Create a map for fast lookup
+            const profilesMap = new Map(
+              (profilesData || []).map(p => [p.id, p])
+            )
+
+            // Extract all conversation IDs
+            const conversationIds = conversationsData.map(conv => conv.id)
+
+            // Batch fetch last messages - use a subquery approach
+            // Get all messages for these conversations, ordered, then filter to first per conversation
+            const { data: messagesData } = await supabase
+              .from('messages')
+              .select('conversation_id, content, sent_at, sender_id')
+              .in('conversation_id', conversationIds)
+              .order('sent_at', { ascending: false })
+
+            // Group messages by conversation and take the first (most recent) for each
+            const lastMessagesMap = new Map()
+            messagesData?.forEach(msg => {
+              if (!lastMessagesMap.has(msg.conversation_id)) {
+                lastMessagesMap.set(msg.conversation_id, msg)
+              }
+            })
+
+            // Batch fetch unread messages and count client-side
+            const { data: unreadMessagesData } = await supabase
+              .from('messages')
+              .select('conversation_id')
+              .in('conversation_id', conversationIds)
+              .neq('sender_id', user.id)
+              .is('read_at', null)
+
+            // Count unread messages per conversation
+            const unreadCountsMap = new Map()
+            unreadMessagesData?.forEach(msg => {
+              const currentCount = unreadCountsMap.get(msg.conversation_id) || 0
+              unreadCountsMap.set(msg.conversation_id, currentCount + 1)
+            })
+
+            // Enrich conversations with the fetched data
+            return conversationsData.map(conv => {
+              const otherParticipantId = conv.participant_one_id === user.id 
+                ? conv.participant_two_id 
+                : conv.participant_one_id
+              
+              const profileData = profilesMap.get(otherParticipantId)
+
+              return {
+                ...conv,
+                otherParticipant: profileData ? {
+                  ...profileData,
+                  role: profileData.role as 'player' | 'coach' | 'club'
+                } : undefined,
+                lastMessage: lastMessagesMap.get(conv.id) || undefined,
+                unreadCount: unreadCountsMap.get(conv.id) || 0
+              }
+            })
           },
           15000 // 15 second cache for conversations
         )
 
         setConversations(enrichedConversations)
       } catch (error) {
-        console.error('Error fetching conversations:', error)
+        logger.error('Error fetching conversations:', error)
       } finally {
         setLoading(false)
       }

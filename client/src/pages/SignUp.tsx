@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom'
 import { Eye, EyeOff, Mail, Lock, User, Building2, Briefcase } from 'lucide-react'
 import { Input, Button } from '@/components'
 import { supabase } from '@/lib/supabase'
+import { logger } from '@/lib/logger'
 
 type UserRole = 'player' | 'coach' | 'club'
 
@@ -44,7 +45,7 @@ export default function SignUp() {
         throw new Error('Password must be at least 8 characters long')
       }
 
-      console.log('Creating auth account with role:', selectedRole)
+      logger.debug('Creating auth account with role:', selectedRole)
 
       // Create auth account (no session until email verified)
       const { data: authData, error: signUpError } = await supabase.auth.signUp({
@@ -61,19 +62,19 @@ export default function SignUp() {
       if (signUpError) throw signUpError
       if (!authData.user) throw new Error('No user data returned from signup')
 
-      console.log('Auth account created successfully:', authData.user.id)
+      logger.debug('Auth account created successfully:', authData.user.id)
 
       // Store role in localStorage as fallback
       localStorage.setItem('pending_role', selectedRole)
       localStorage.setItem('pending_email', formData.email)
 
-      console.log('Redirecting to /verify-email')
+      logger.debug('Redirecting to /verify-email')
 
       // Redirect to verify email page
       navigate(`/verify-email?email=${encodeURIComponent(formData.email)}`)
 
     } catch (err) {
-      console.error('Sign up error:', err)
+      logger.error('Sign up error:', err)
       setError(err instanceof Error ? err.message : 'Failed to create account')
     } finally {
       setLoading(false)

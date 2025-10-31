@@ -4,6 +4,7 @@ import { User, MapPin, Globe, Calendar, Building2 } from 'lucide-react'
 import { Input, Button } from '@/components'
 import { supabase } from '@/lib/supabase'
 import { useAuthStore } from '@/lib/auth'
+import { logger } from '@/lib/logger'
 
 type UserRole = 'player' | 'coach' | 'club'
 
@@ -51,7 +52,7 @@ export default function CompleteProfile() {
         const { data: { session } } = await supabase.auth.getSession()
 
         if (!session) {
-          console.error('No session found in CompleteProfile')
+          logger.error('No session found in CompleteProfile')
           navigate('/signup')
           return
         }
@@ -67,7 +68,7 @@ export default function CompleteProfile() {
 
         // If profile doesn't exist, create it now
         if (profileError && profileError.code === 'PGRST116') {
-          console.log('Profile not found, creating basic profile')
+          logger.debug('Profile not found, creating basic profile')
           
           // Get role from user metadata or localStorage
           const role = session.user.user_metadata?.role || localStorage.getItem('pending_role') || 'player'
@@ -85,13 +86,13 @@ export default function CompleteProfile() {
             } as unknown as never)
 
           if (insertError) {
-            console.error('Error creating profile:', insertError)
+            logger.error('Error creating profile:', insertError)
             setError('Could not create your profile. Please try again or contact support.')
             setCheckingProfile(false)
             return
           }
 
-          console.log('Basic profile created successfully')
+          logger.debug('Basic profile created successfully')
 
           // Use the newly created profile
           setUserRole(role as UserRole)
@@ -101,14 +102,14 @@ export default function CompleteProfile() {
         }
 
         if (profileError) {
-          console.error('Error fetching profile:', profileError)
+          logger.error('Error fetching profile:', profileError)
           setError('Could not load your profile. Please try again.')
           setCheckingProfile(false)
           return
         }
 
         if (!profile) {
-          console.error('Profile not found and could not be created')
+          logger.error('Profile not found and could not be created')
           setError('Profile not found. Please contact support.')
           setCheckingProfile(false)
           return
@@ -116,7 +117,7 @@ export default function CompleteProfile() {
 
         // If profile already complete, go to dashboard
         if (profile.full_name) {
-          console.log('Profile already complete, redirecting to dashboard')
+          logger.debug('Profile already complete, redirecting to dashboard')
           navigate('/dashboard/profile')
           return
         }
@@ -130,7 +131,7 @@ export default function CompleteProfile() {
         }
 
       } catch (err) {
-        console.error('Error checking session:', err)
+        logger.error('Error checking session:', err)
         setError('Something went wrong. Please try again.')
       } finally {
         setCheckingProfile(false)
@@ -188,7 +189,7 @@ export default function CompleteProfile() {
         }
       }
 
-      console.log('Updating profile with data:', updateData)
+      logger.debug('Updating profile with data:', updateData)
 
       // Update profile
       const { error: updateError } = await supabase
@@ -197,11 +198,11 @@ export default function CompleteProfile() {
         .eq('id', userId)
 
       if (updateError) {
-        console.error('Error updating profile:', updateError)
+        logger.error('Error updating profile:', updateError)
         throw new Error(`Failed to update profile: ${updateError.message}`)
       }
 
-      console.log('Profile updated successfully')
+      logger.debug('Profile updated successfully')
 
       // Fetch the updated profile to verify
       const { data: updatedProfile, error: fetchError } = await supabase
@@ -211,25 +212,25 @@ export default function CompleteProfile() {
         .single()
 
       if (fetchError || !updatedProfile) {
-        console.error('Error fetching updated profile:', fetchError)
+        logger.error('Error fetching updated profile:', fetchError)
         throw new Error('Profile updated but could not verify. Please refresh the page.')
       }
 
-      console.log('Updated profile verified:', updatedProfile)
+      logger.debug('Updated profile verified:', updatedProfile)
 
       // Refresh the auth store with the updated profile
       const { fetchProfile } = useAuthStore.getState()
       await fetchProfile(userId)
       
-      console.log('Auth store refreshed with updated profile')
+      logger.debug('Auth store refreshed with updated profile')
 
       // Redirect to dashboard with role-specific route
       const dashboardRoute = updatedProfile.role === 'club' ? '/dashboard/profile' : '/dashboard/profile'
-      console.log('Redirecting to:', dashboardRoute)
+      logger.debug('Redirecting to:', dashboardRoute)
       navigate(dashboardRoute)
 
     } catch (err) {
-      console.error('Complete profile error:', err)
+      logger.error('Complete profile error:', err)
       setError(err instanceof Error ? err.message : 'Failed to complete profile. Please try again.')
     } finally {
       setLoading(false)

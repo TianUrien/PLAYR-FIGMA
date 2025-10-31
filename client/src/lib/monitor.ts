@@ -75,7 +75,7 @@ class PerformanceMonitor {
   /**
    * Record a metric manually
    */
-  private recordMetric(metric: PerformanceMetric) {
+  recordMetric(metric: PerformanceMetric) {
     this.metrics.push(metric);
 
     // Keep only recent metrics
@@ -245,6 +245,41 @@ if (typeof window !== 'undefined') {
 }
 
 /**
+ * Initialize Web Vitals tracking
+ * Captures Core Web Vitals (TTFB, FCP, LCP, INP, CLS) and logs to console in development
+ */
+export function initWebVitals() {
+  if (typeof window === 'undefined') return;
+
+  import('web-vitals').then(({ onCLS, onFCP, onLCP, onTTFB, onINP }) => {
+    const logVital = (metric: { name: string; value: number; rating: string }) => {
+      const isDev = import.meta.env.DEV;
+      if (isDev) {
+        console.log(`[Web Vitals] ${metric.name}:`, {
+          value: metric.value,
+          rating: metric.rating,
+        });
+      }
+      
+      // Store in performance metrics for analysis
+      monitor.recordMetric({
+        name: `web_vital_${metric.name.toLowerCase()}`,
+        duration: metric.value,
+        timestamp: Date.now(),
+        success: metric.rating === 'good',
+        tags: { rating: metric.rating, route: window.location.pathname },
+      });
+    };
+
+    onCLS(logVital);
+    onFCP(logVital);
+    onLCP(logVital);
+    onTTFB(logVital);
+    onINP(logVital);
+  });
+}
+
+/**
  * Usage examples:
  * 
  * // Measure an operation
@@ -266,5 +301,8 @@ if (typeof window !== 'undefined') {
  * // Check health
  * const health = monitor.getHealthStatus();
  * console.log('System health:', health);
+ * 
+ * // Initialize Web Vitals tracking (call once in main.tsx)
+ * initWebVitals();
  */
 

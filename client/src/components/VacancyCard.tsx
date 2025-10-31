@@ -231,6 +231,7 @@ export default function VacancyCard({
           onClick={onViewDetails}
           className="p-3 border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors"
           title="View details"
+          aria-label={`View details for ${vacancy.title} position at ${clubName}`}
         >
           <Eye className="w-4 h-4 text-gray-600" />
         </button>

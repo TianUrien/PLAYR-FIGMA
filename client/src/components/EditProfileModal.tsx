@@ -3,6 +3,7 @@ import { X, Upload, Loader2 } from 'lucide-react'
 import { supabase } from '@/lib/supabase'
 import { useAuthStore } from '@/lib/auth'
 import { Button, Input } from '@/components'
+import { logger } from '@/lib/logger'
 
 interface EditProfileModalProps {
   isOpen: boolean
@@ -63,7 +64,7 @@ export default function EditProfileModal({ isOpen, onClose, role }: EditProfileM
 
       setFormData({ ...formData, avatar_url: publicUrl });
     } catch (error) {
-      console.error('Error uploading avatar:', error);
+      logger.error('Error uploading avatar:', error);
       setError('Failed to upload avatar');
     }
   };
@@ -107,9 +108,9 @@ export default function EditProfileModal({ isOpen, onClose, role }: EditProfileM
         updateData.club_history = formData.club_history || null
       }
 
-      console.log('🔍 Attempting to update profile with data:', updateData)
-      console.log('🔍 Profile ID:', profile.id)
-      console.log('🔍 Role:', role)
+      logger.debug('Attempting to update profile with data:', updateData)
+      logger.debug('Profile ID:', profile.id)
+      logger.debug('Role:', role)
 
       // Update profile in database
       const { data, error: updateError } = await supabase
@@ -118,11 +119,11 @@ export default function EditProfileModal({ isOpen, onClose, role }: EditProfileM
         .eq('id', profile.id)
         .select()
 
-      console.log('✅ Update response data:', data)
-      console.log('❌ Update error:', updateError)
+      logger.debug('Update response data:', data)
+      logger.debug('Update error:', updateError)
 
       if (updateError) {
-        console.error('❌ Supabase update error details:', {
+        logger.error('Supabase update error details:', {
           message: updateError.message,
           details: updateError.details,
           hint: updateError.hint,
@@ -137,9 +138,9 @@ export default function EditProfileModal({ isOpen, onClose, role }: EditProfileM
       // Close modal
       onClose()
     } catch (err) {
-      console.error('❌ Profile update error:', err)
-      console.error('❌ Error type:', typeof err)
-      console.error('❌ Error object:', JSON.stringify(err, null, 2))
+      logger.error('Profile update error:', err)
+      logger.error('Error type:', typeof err)
+      logger.error('Error object:', JSON.stringify(err, null, 2))
       setError(err instanceof Error ? err.message : 'Failed to update profile')
     } finally {
       setLoading(false)

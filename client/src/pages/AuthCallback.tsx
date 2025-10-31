@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { supabase } from '@/lib/supabase'
+import { logger } from '@/lib/logger'
 
 /**
  * AuthCallback - Handles email verification redirect from Supabase
@@ -26,7 +27,7 @@ export default function AuthCallback() {
       if (sessionEstablished) return
       sessionEstablished = true
 
-      console.log('✅ Session established for user:', userId)
+      logger.debug('Session established for user:', userId)
       setStatus('Loading your profile...')
 
       try {
@@ -39,42 +40,42 @@ export default function AuthCallback() {
 
         // If profile doesn't exist (PGRST116), send to CompleteProfile to create it
         if (profileError && profileError.code === 'PGRST116') {
-          console.log('📝 Profile not found (new user), routing to /complete-profile')
+          logger.debug('Profile not found (new user), routing to /complete-profile')
           navigate('/complete-profile')
           return
         }
 
         // Other errors
         if (profileError) {
-          console.error('❌ Error fetching profile:', profileError)
+          logger.error('Error fetching profile:', profileError)
           setError('Could not load your profile. Please try again or contact support.')
           return
         }
 
         if (!profile) {
-          console.error('❌ Profile is null (unexpected)')
+          logger.error('Profile is null (unexpected)')
           setError('Profile not found. Please contact support.')
           return
         }
 
-        console.log('📋 Profile found:', profile)
+        logger.debug('Profile found:', profile)
 
         // Check if profile is complete
         if (!profile.full_name) {
-          console.log('➡️ Profile incomplete, routing to /complete-profile')
+          logger.debug('Profile incomplete, routing to /complete-profile')
           navigate('/complete-profile')
         } else {
-          console.log('➡️ Profile complete, routing to /dashboard')
+          logger.debug('Profile complete, routing to /dashboard')
           navigate('/dashboard/profile')
         }
 
       } catch (err) {
-        console.error('💥 Error checking profile:', err)
+        logger.error('Error checking profile:', err)
         setError('Something went wrong. Please try again.')
       }
     }
 
-    // � Log initial state
+    // 🔍 Log initial state
     const queryParams = new URLSearchParams(window.location.search)
     const pkceCode = queryParams.get('code')
     const hash = window.location.hash
@@ -82,11 +83,11 @@ export default function AuthCallback() {
     const hasAccessToken = hashParams.has('access_token')
     const hasError = hashParams.has('error')
     
-    console.log('🔍 AuthCallback initialized')
-    console.log('📍 Full URL:', window.location.href)
-    console.log('🔑 PKCE code present:', !!pkceCode)
-    console.log('🔑 Access token in hash:', hasAccessToken)
-    console.log('⚠️ Error in hash:', hasError)
+    logger.debug('AuthCallback initialized')
+    logger.debug('Full URL:', window.location.href)
+    logger.debug('PKCE code present:', !!pkceCode)
+    logger.debug('Access token in hash:', hasAccessToken)
+    logger.debug('Error in hash:', hasError)
 
     // 🎯 STRATEGY: Let Supabase SDK handle everything via detectSessionInUrl
     // The SDK is configured with detectSessionInUrl: true, which means it will:
@@ -101,7 +102,7 @@ export default function AuthCallback() {
 
     // Listen for auth state changes (SDK will trigger this after processing URL)
     const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, session) => {
-      console.log('🔔 Auth state change:', event, session?.user?.id)
+      logger.debug('Auth state change:', event, session?.user?.id)
 
       if (event === 'SIGNED_IN' && session) {
         await handleSession(session.user.id)
@@ -111,16 +112,16 @@ export default function AuthCallback() {
     // Fallback timeout - check status after giving SDK time to process
     const timeoutId = setTimeout(async () => {
       if (sessionEstablished) {
-        console.log('✅ Session already established, timeout is no-op')
+        logger.debug('Session already established, timeout is no-op')
         return
       }
 
-      console.log('⏱️ Timeout reached - checking session status...')
+      logger.debug('Timeout reached - checking session status...')
       
       // Check if SDK already established a session (might have missed the event)
       const { data: { session } } = await supabase.auth.getSession()
       if (session) {
-        console.log('✅ Session found via getSession() - SDK completed exchange')
+        logger.debug('Session found via getSession() - SDK completed exchange')
         await handleSession(session.user.id)
         return
       }
@@ -132,14 +133,14 @@ export default function AuthCallback() {
       const errorParam = params.get('error')
       
       if (errorParam) {
-        console.error('❌ Auth error in URL:', errorParam)
+        logger.error('Auth error in URL:', errorParam)
         navigate(`/verify-email?error=${encodeURIComponent(errorParam)}`)
         return
       }
       
       // Handle implicit flow tokens (non-PKCE)
       if (accessToken && refreshToken) {
-        console.log('🔧 Implicit flow tokens found, setting session manually...')
+        logger.debug('Implicit flow tokens found, setting session manually...')
         setStatus('Establishing session...')
 
         const { data: { session }, error: sessionError } = await supabase.auth.setSession({
@@ -148,20 +149,20 @@ export default function AuthCallback() {
         })
 
         if (sessionError) {
-          console.error('❌ Error setting session:', sessionError)
+          logger.error('Error setting session:', sessionError)
           navigate('/verify-email?error=session_failed')
           return
         }
 
         if (session) {
-          console.log('✅ Session created from implicit flow tokens')
+          logger.debug('Session created from implicit flow tokens')
           await handleSession(session.user.id)
           return
         }
       }
 
       // No session, no tokens, nothing worked - link is invalid/expired
-      console.error('❌ No session established - link may be expired or already used')
+      logger.error('No session established - link may be expired or already used')
       const storedEmail = localStorage.getItem('pending_email')
       const emailParam = storedEmail ? `&email=${encodeURIComponent(storedEmail)}` : ''
       navigate(`/verify-email?error=expired&reason=no_tokens${emailParam}`)

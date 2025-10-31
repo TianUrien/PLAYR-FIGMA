@@ -176,6 +176,9 @@ export default function Header() {
                   <button 
                     onClick={() => setDropdownOpen(!dropdownOpen)}
                     className="flex items-center gap-2 hover:opacity-80 transition-opacity"
+                    aria-label="Open user menu"
+                    aria-expanded={dropdownOpen ? 'true' : 'false'}
+                    aria-haspopup="true"
                   >
                     <Avatar
                       src={profile.avatar_url}
@@ -187,13 +190,18 @@ export default function Header() {
 
                   {/* Dropdown Menu */}
                   {dropdownOpen && (
-                    <div className="absolute right-0 mt-2 w-48 bg-white rounded-lg shadow-lg border border-gray-200 py-1 z-50">
+                    <div 
+                      className="absolute right-0 mt-2 w-48 bg-white rounded-lg shadow-lg border border-gray-200 py-1 z-50"
+                      role="menu"
+                      aria-orientation="vertical"
+                    >
                       <button
                         onClick={() => {
                           setDropdownOpen(false)
                           handleSignOut()
                         }}
                         className="w-full text-left px-4 py-2 text-sm text-gray-700 hover:bg-gray-50 transition-colors flex items-center gap-2"
+                        role="menuitem"
                       >
                         <LogOut className="w-4 h-4" />
                         Sign Out
@@ -204,6 +212,7 @@ export default function Header() {
                           setDeleteModalOpen(true)
                         }}
                         className="w-full text-left px-4 py-2 text-sm text-red-600 hover:bg-red-50 transition-colors flex items-center gap-2"
+                        role="menuitem"
                       >
                         <Trash2 className="w-4 h-4" />
                         Delete Account

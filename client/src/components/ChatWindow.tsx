@@ -3,6 +3,7 @@ import { Send, ArrowLeft, Circle } from 'lucide-react'
 import { supabase } from '@/lib/supabase'
 import { format } from 'date-fns'
 import { monitor } from '@/lib/monitor'
+import { logger } from '@/lib/logger'
 
 interface Message {
   id: string
@@ -116,10 +117,10 @@ export default function ChatWindow({ conversation, currentUserId, onBack, onMess
         .order('sent_at', { ascending: true })
 
       if (error) throw error
-      console.log('Fetched messages:', data)
+      logger.debug('Fetched messages:', data)
       setMessages(data || [])
     } catch (error) {
-      console.error('Error fetching messages:', error)
+      logger.error('Error fetching messages:', error)
     } finally {
       setLoading(false)
     }
@@ -136,7 +137,7 @@ export default function ChatWindow({ conversation, currentUserId, onBack, onMess
 
       onMessageSent()
     } catch (error) {
-      console.error('Error marking messages as read:', error)
+      logger.error('Error marking messages as read:', error)
     }
   }
 
@@ -168,7 +169,7 @@ export default function ChatWindow({ conversation, currentUserId, onBack, onMess
 
         // Immediately add the message to local state for instant feedback
         if (data && data[0]) {
-          console.log('Message sent, adding to local state:', data[0])
+          logger.debug('Message sent, adding to local state:', data[0])
           setMessages(prev => [...prev, data[0]])
         }
 
@@ -176,7 +177,7 @@ export default function ChatWindow({ conversation, currentUserId, onBack, onMess
         inputRef.current?.focus()
         onMessageSent()
       } catch (error) {
-        console.error('Error sending message:', error)
+        logger.error('Error sending message:', error)
         alert('Failed to send message. Please try again.')
         throw error
       }

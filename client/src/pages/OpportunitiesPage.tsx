@@ -10,6 +10,7 @@ import ApplyToVacancyModal from '../components/ApplyToVacancyModal'
 import Button from '../components/Button'
 import { requestCache } from '@/lib/requestCache'
 import { monitor } from '@/lib/monitor'
+import { logger } from '@/lib/logger'
 
 interface FiltersState {
   opportunityType: 'all' | 'player' | 'coach'
@@ -67,14 +68,14 @@ export default function OpportunitiesPage() {
 
             if (vacanciesError) throw vacanciesError
 
-            console.log('Fetched vacancies:', vacanciesData)
+            logger.debug('Fetched vacancies:', vacanciesData)
 
             // Fetch club details
-            let clubsMap: Record<string, { id: string; full_name: string; avatar_url: string | null }> = {}
+            const clubsMap: Record<string, { id: string; full_name: string; avatar_url: string | null }> = {}
             
             if (vacanciesData && vacanciesData.length > 0) {
               const clubIds = [...new Set(vacanciesData.map((v: Vacancy) => v.club_id))]
-              console.log('Fetching clubs for IDs:', clubIds)
+              logger.debug('Fetching clubs for IDs:', clubIds)
               
               const { data: clubsData, error: clubsError } = await supabase
                 .from('profiles')
@@ -82,16 +83,16 @@ export default function OpportunitiesPage() {
                 .in('id', clubIds)
 
               if (clubsError) {
-                console.error('Error fetching clubs:', clubsError)
+                logger.error('Error fetching clubs:', clubsError)
                 throw clubsError
               }
 
-              console.log('Fetched clubs:', clubsData)
+              logger.debug('Fetched clubs:', clubsData)
 
               clubsData?.forEach((club: { id: string; full_name: string; avatar_url: string | null }) => {
                 clubsMap[club.id] = club
               })
-              console.log('Clubs map:', clubsMap)
+              logger.debug('Clubs map:', clubsMap)
             }
 
             return { vacanciesData, clubsMap }
@@ -102,7 +103,7 @@ export default function OpportunitiesPage() {
         setVacancies((vacanciesData as Vacancy[]) || [])
         setClubs(clubsMap)
       } catch (error) {
-        console.error('Error fetching vacancies:', error)
+        logger.error('Error fetching vacancies:', error)
       } finally {
         setIsLoading(false)
       }
@@ -135,7 +136,7 @@ export default function OpportunitiesPage() {
         
         setUserApplications(appliedVacancyIds)
       } catch (error) {
-        console.error('Error fetching user applications:', error)
+        logger.error('Error fetching user applications:', error)
       }
     }, { userId: user.id })
   }, [user, profile])
