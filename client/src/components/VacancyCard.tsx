@@ -1,5 +1,4 @@
-import { MapPin, Calendar, Clock, Eye, Bookmark, Home, Car, Globe as GlobeIcon, Plane, Utensils, Briefcase, Shield, GraduationCap } from 'lucide-react'
-import { useState } from 'react'
+import { MapPin, Calendar, Clock, Eye, Home, Car, Globe as GlobeIcon, Plane, Utensils, Briefcase, Shield, GraduationCap } from 'lucide-react'
 import { useNavigate } from 'react-router-dom'
 import type { Vacancy } from '../lib/database.types'
 import { Avatar } from './index'
@@ -36,7 +35,6 @@ export default function VacancyCard({
   hasApplied = false
 }: VacancyCardProps) {
   const navigate = useNavigate()
-  const [isSaved, setIsSaved] = useState(false)
 
   const handleClubClick = (e: React.MouseEvent) => {
     e.stopPropagation()
@@ -108,17 +106,6 @@ export default function VacancyCard({
               {clubName}
             </h3>
           </div>
-        </button>
-
-        {/* Bookmark */}
-        <button
-          onClick={() => setIsSaved(!isSaved)}
-          className="p-2 hover:bg-gray-100 rounded-lg transition-colors"
-          title={isSaved ? 'Saved' : 'Save'}
-        >
-          <Bookmark
-            className={`w-5 h-5 ${isSaved ? 'fill-blue-600 text-blue-600' : 'text-gray-400'}`}
-          />
         </button>
       </div>
 

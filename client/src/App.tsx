@@ -11,6 +11,7 @@ import VerifyEmail from '@/pages/VerifyEmail'
 const CompleteProfile = lazy(() => import('@/pages/CompleteProfile'))
 const DashboardRouter = lazy(() => import('@/pages/DashboardRouter'))
 const OpportunitiesPage = lazy(() => import('@/pages/OpportunitiesPage'))
+const OpportunityDetailPage = lazy(() => import('@/pages/OpportunityDetailPage'))
 const CommunityPage = lazy(() => import('@/pages/CommunityPage'))
 const ApplicantsList = lazy(() => import('@/pages/ApplicantsList'))
 const PublicPlayerProfile = lazy(() => import('@/pages/PublicPlayerProfile'))
@@ -50,6 +51,7 @@ function App() {
               <Route path="/complete-profile" element={<CompleteProfile />} />
               <Route path="/community" element={<CommunityPage />} />
               <Route path="/opportunities" element={<OpportunitiesPage />} />
+              <Route path="/opportunities/:id" element={<OpportunityDetailPage />} />
               <Route path="/messages" element={<MessagesPage />} />
               <Route path="/dashboard/profile" element={<DashboardRouter />} />
               <Route path="/dashboard/club/vacancies/:vacancyId/applicants" element={<ApplicantsList />} />

@@ -5,6 +5,7 @@ import { useAuthStore } from '../lib/auth'
 import type { Vacancy } from '../lib/database.types'
 import Header from '../components/Header'
 import VacancyCard from '../components/VacancyCard'
+import VacancyDetailView from '../components/VacancyDetailView'
 import ApplyToVacancyModal from '../components/ApplyToVacancyModal'
 import Button from '../components/Button'
 import { requestCache } from '@/lib/requestCache'
@@ -32,6 +33,7 @@ export default function OpportunitiesPage() {
   const [userApplications, setUserApplications] = useState<Set<string>>(new Set())
   const [selectedVacancy, setSelectedVacancy] = useState<Vacancy | null>(null)
   const [showApplyModal, setShowApplyModal] = useState(false)
+  const [showDetailView, setShowDetailView] = useState(false)
   const [isLoading, setIsLoading] = useState(true)
   const [viewMode, setViewMode] = useState<'grid' | 'list'>('grid')
   const [sortBy, setSortBy] = useState<'newest' | 'relevance'>('newest')
@@ -525,8 +527,8 @@ export default function OpportunitiesPage() {
                       clubLogo={club?.avatar_url || null}
                       clubId={vacancy.club_id}
                       onViewDetails={() => {
-                        // TODO: Open detail modal
-                        console.log('View details:', vacancy.id)
+                        setSelectedVacancy(vacancy)
+                        setShowDetailView(true)
                       }}
                       onApply={
                         user && (profile?.role === 'player' || profile?.role === 'coach')
@@ -545,6 +547,29 @@ export default function OpportunitiesPage() {
           </div>
         </div>
       </main>
+
+      {/* Vacancy Detail View */}
+      {selectedVacancy && showDetailView && (
+        <VacancyDetailView
+          vacancy={selectedVacancy}
+          clubName={clubs[selectedVacancy.club_id]?.full_name || 'Unknown Club'}
+          clubLogo={clubs[selectedVacancy.club_id]?.avatar_url || null}
+          clubId={selectedVacancy.club_id}
+          onClose={() => {
+            setShowDetailView(false)
+            setSelectedVacancy(null)
+          }}
+          onApply={
+            user && (profile?.role === 'player' || profile?.role === 'coach')
+              ? () => {
+                  setShowDetailView(false)
+                  setShowApplyModal(true)
+                }
+              : undefined
+          }
+          hasApplied={userApplications.has(selectedVacancy.id)}
+        />
+      )}
 
       {/* Apply Modal */}
       {selectedVacancy && (
