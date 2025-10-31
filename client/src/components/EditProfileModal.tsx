@@ -1,9 +1,8 @@
-import { useState, useEffect, useRef } from 'react'
-import { X, Camera, MapPin, Globe, Linkedin, Instagram, Twitter, Calendar, Trophy, User } from 'lucide-react'
+import { useState, useRef } from 'react'
+import { X, Upload, Loader2 } from 'lucide-react'
 import { supabase } from '@/lib/supabase'
-import type { Profile } from '@/lib/database.types'
-import CountrySelector from './CountrySelector'
-import { Avatar } from './index'
+import { useAuthStore } from '@/lib/auth'
+import { Button, Input } from '@/components'
 import { logger } from '@/lib/logger'
 import { optimizeImage, validateImage } from '@/lib/imageOptimization'
 
