@@ -57,30 +57,30 @@ export default function Header() {
   }, [user?.id]) // Only depend on user.id to prevent unnecessary recreations
 
   useEffect(() => {
-    if (user) {
-      fetchUnreadCount()
-      
-      // Set up real-time subscription for message updates
-      const channel = supabase
-        .channel('unread-messages')
-        .on(
-          'postgres_changes',
-          {
-            event: '*',
-            schema: 'public',
-            table: 'messages'
-          },
-          () => {
-            fetchUnreadCount()
-          }
-        )
-        .subscribe()
+    if (!user?.id) return
+    
+    fetchUnreadCount()
+    
+    // Set up real-time subscription for message updates
+    const channel = supabase
+      .channel('unread-messages')
+      .on(
+        'postgres_changes',
+        {
+          event: '*',
+          schema: 'public',
+          table: 'messages'
+        },
+        () => {
+          fetchUnreadCount()
+        }
+      )
+      .subscribe()
 
-      return () => {
-        supabase.removeChannel(channel)
-      }
+    return () => {
+      supabase.removeChannel(channel)
     }
-  }, [user, fetchUnreadCount])
+  }, [user?.id, fetchUnreadCount]) // Fixed: Use user?.id instead of user object
 
   // Close dropdown when clicking outside
   useEffect(() => {

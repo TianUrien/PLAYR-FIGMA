@@ -49,51 +49,8 @@ export default function MessagesPage() {
     }
   }, [searchParams])
 
-  useEffect(() => {
-    if (user) {
-      fetchConversations()
-    }
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [user])
-
-  // Set up real-time subscription for new messages
-  useEffect(() => {
-    if (!user) return
-
-    const channel = supabase
-      .channel('messages-realtime')
-      .on(
-        'postgres_changes',
-        {
-          event: 'INSERT',
-          schema: 'public',
-          table: 'messages'
-        },
-        () => {
-          fetchConversations()
-        }
-      )
-      .on(
-        'postgres_changes',
-        {
-          event: 'UPDATE',
-          schema: 'public',
-          table: 'messages'
-        },
-        () => {
-          fetchConversations()
-        }
-      )
-      .subscribe()
-
-    return () => {
-      supabase.removeChannel(channel)
-    }
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [user])
-
   const fetchConversations = useCallback(async () => {
-    if (!user) return
+    if (!user?.id) return
 
     await monitor.measure('fetch_conversations', async () => {
       const cacheKey = `conversations-${user.id}`
@@ -201,7 +158,48 @@ export default function MessagesPage() {
         setLoading(false)
       }
     }, { userId: user.id })
-  }, [user])
+  }, [user?.id]) // Fixed: Only depend on user.id to prevent unnecessary recreations
+
+  useEffect(() => {
+    if (user?.id) {
+      fetchConversations()
+    }
+  }, [user?.id, fetchConversations]) // Fixed: Use user?.id instead of user object
+
+  // Set up real-time subscription for new messages
+  useEffect(() => {
+    if (!user?.id) return
+
+    const channel = supabase
+      .channel('messages-realtime')
+      .on(
+        'postgres_changes',
+        {
+          event: 'INSERT',
+          schema: 'public',
+          table: 'messages'
+        },
+        () => {
+          fetchConversations()
+        }
+      )
+      .on(
+        'postgres_changes',
+        {
+          event: 'UPDATE',
+          schema: 'public',
+          table: 'messages'
+        },
+        () => {
+          fetchConversations()
+        }
+      )
+      .subscribe()
+
+    return () => {
+      supabase.removeChannel(channel)
+    }
+  }, [user?.id, fetchConversations]) // Fixed: Use user?.id instead of user object
 
   const filteredConversations = conversations.filter((conv) =>
     conv.otherParticipant?.full_name.toLowerCase().includes(searchQuery.toLowerCase())

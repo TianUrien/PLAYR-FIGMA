@@ -23,6 +23,7 @@ export default function VacanciesTab({ profileId, readOnly = false, triggerCreat
   const [isLoading, setIsLoading] = useState(true)
   const [showModal, setShowModal] = useState(false)
   const [editingVacancy, setEditingVacancy] = useState<Vacancy | null>(null)
+  const [actionLoading, setActionLoading] = useState<string | null>(null) // Track which vacancy action is loading
 
   const fetchVacancies = useCallback(async () => {
     if (!targetUserId) return
@@ -88,9 +89,11 @@ export default function VacanciesTab({ profileId, readOnly = false, triggerCreat
   }
 
   const handleDuplicate = async (vacancy: Vacancy) => {
-    if (!user) return
+    if (!user || actionLoading) return
 
+    setActionLoading(vacancy.id)
     try {
+      // eslint-disable-next-line @typescript-eslint/no-unused-vars
       const { id, created_at, updated_at, published_at, closed_at, ...duplicateData } = vacancy
       
       const newVacancy = {
@@ -109,10 +112,15 @@ export default function VacanciesTab({ profileId, readOnly = false, triggerCreat
     } catch (error) {
       console.error('Error duplicating vacancy:', error)
       alert('Failed to duplicate vacancy. Please try again.')
+    } finally {
+      setActionLoading(null)
     }
   }
 
   const handleClose = async (vacancyId: string) => {
+    if (actionLoading) return
+    
+    setActionLoading(vacancyId)
     try {
       const { error } = await supabase
         .from('vacancies')
@@ -125,10 +133,15 @@ export default function VacanciesTab({ profileId, readOnly = false, triggerCreat
     } catch (error) {
       console.error('Error closing vacancy:', error)
       alert('Failed to close vacancy. Please try again.')
+    } finally {
+      setActionLoading(null)
     }
   }
 
   const handlePublish = async (vacancyId: string) => {
+    if (actionLoading) return
+    
+    setActionLoading(vacancyId)
     try {
       const { error } = await supabase
         .from('vacancies')
@@ -141,10 +154,14 @@ export default function VacanciesTab({ profileId, readOnly = false, triggerCreat
     } catch (error) {
       console.error('Error publishing vacancy:', error)
       alert('Failed to publish vacancy. Please try again.')
+    } finally {
+      setActionLoading(null)
     }
   }
 
   const getStatusBadge = (status: Vacancy['status']) => {
+    if (!status) return null
+    
     const styles = {
       draft: 'bg-gray-100 text-gray-700',
       open: 'bg-green-100 text-green-700',
@@ -261,7 +278,7 @@ export default function VacanciesTab({ profileId, readOnly = false, triggerCreat
                   <Calendar className="w-4 h-4 flex-shrink-0" />
                   <span>Start: {formatDate(vacancy.start_date)}</span>
                 </div>
-                {vacancy.benefits.length > 0 && (
+                {vacancy.benefits && vacancy.benefits.length > 0 && (
                   <div className="flex items-center gap-2 text-sm">
                     <span className="text-gray-600">Benefits:</span>
                     <span className="font-medium text-green-600">{vacancy.benefits.length} included</span>
@@ -285,7 +302,8 @@ export default function VacanciesTab({ profileId, readOnly = false, triggerCreat
                 <div className="flex items-center gap-2 pt-4 border-t border-gray-200">
                 <button
                   onClick={() => handleEdit(vacancy)}
-                  className="flex-1 flex items-center justify-center gap-2 px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50 rounded-lg transition-colors"
+                  disabled={actionLoading === vacancy.id}
+                  className="flex-1 flex items-center justify-center gap-2 px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50 rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
                   title="Edit vacancy"
                 >
                   <Edit2 className="w-4 h-4" />
@@ -293,29 +311,32 @@ export default function VacanciesTab({ profileId, readOnly = false, triggerCreat
                 </button>
                 <button
                   onClick={() => handleDuplicate(vacancy)}
-                  className="flex-1 flex items-center justify-center gap-2 px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50 rounded-lg transition-colors"
+                  disabled={actionLoading === vacancy.id}
+                  className="flex-1 flex items-center justify-center gap-2 px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50 rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
                   title="Duplicate vacancy"
                 >
                   <Copy className="w-4 h-4" />
-                  Duplicate
+                  {actionLoading === vacancy.id ? 'Duplicating...' : 'Duplicate'}
                 </button>
                 {vacancy.status === 'draft' && (
                   <button
                     onClick={() => handlePublish(vacancy.id)}
-                    className="flex-1 flex items-center justify-center gap-2 px-4 py-2 text-sm font-medium text-green-700 hover:bg-green-50 rounded-lg transition-colors"
+                    disabled={actionLoading === vacancy.id}
+                    className="flex-1 flex items-center justify-center gap-2 px-4 py-2 text-sm font-medium text-green-700 hover:bg-green-50 rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
                     title="Publish vacancy"
                   >
-                    Publish
+                    {actionLoading === vacancy.id ? 'Publishing...' : 'Publish'}
                   </button>
                 )}
                 {vacancy.status === 'open' && (
                   <button
                     onClick={() => handleClose(vacancy.id)}
-                    className="flex-1 flex items-center justify-center gap-2 px-4 py-2 text-sm font-medium text-red-700 hover:bg-red-50 rounded-lg transition-colors"
+                    disabled={actionLoading === vacancy.id}
+                    className="flex-1 flex items-center justify-center gap-2 px-4 py-2 text-sm font-medium text-red-700 hover:bg-red-50 rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
                     title="Close vacancy"
                   >
                     <Archive className="w-4 h-4" />
-                    Close
+                    {actionLoading === vacancy.id ? 'Closing...' : 'Close'}
                   </button>
                 )}
               </div>

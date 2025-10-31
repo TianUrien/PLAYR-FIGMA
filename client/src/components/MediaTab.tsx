@@ -21,6 +21,8 @@ export default function MediaTab({ profileId, readOnly = false }: MediaTabProps)
   const [galleryPhotos, setGalleryPhotos] = useState<GalleryPhoto[]>([])
   const [isLoadingPhotos, setIsLoadingPhotos] = useState(true)
   const [isUploading, setIsUploading] = useState(false)
+  const [deletingPhotoId, setDeletingPhotoId] = useState<string | null>(null)
+  const [deletingVideo, setDeletingVideo] = useState(false)
 
   // Use the target profile if viewing someone else, otherwise use auth profile
   const displayProfile = targetProfile || authProfile
@@ -148,8 +150,9 @@ export default function MediaTab({ profileId, readOnly = false }: MediaTabProps)
   }
 
   const handleDeletePhoto = async (photo: GalleryPhoto) => {
-    if (!confirm('Are you sure you want to delete this photo?')) return
+    if (!confirm('Are you sure you want to delete this photo?') || deletingPhotoId) return
 
+    setDeletingPhotoId(photo.id)
     try {
       // Extract file path from URL
       const urlParts = photo.photo_url.split('/gallery/')
@@ -176,12 +179,15 @@ export default function MediaTab({ profileId, readOnly = false }: MediaTabProps)
     } catch (error) {
       console.error('Error deleting photo:', error)
       alert('Failed to delete photo. Please try again.')
+    } finally {
+      setDeletingPhotoId(null)
     }
   }
 
   const handleDeleteVideo = async () => {
-    if (!user || !confirm('Are you sure you want to remove your highlight video?')) return
+    if (!user || !confirm('Are you sure you want to remove your highlight video?') || deletingVideo) return
 
+    setDeletingVideo(true)
     try {
       const { error } = await supabase
         .from('profiles')
@@ -194,6 +200,8 @@ export default function MediaTab({ profileId, readOnly = false }: MediaTabProps)
     } catch (error) {
       console.error('Error deleting video:', error)
       alert('Failed to remove video. Please try again.')
+    } finally {
+      setDeletingVideo(false)
     }
   }
 
@@ -222,7 +230,8 @@ export default function MediaTab({ profileId, readOnly = false }: MediaTabProps)
             {!readOnly && (
               <button
                 onClick={handleDeleteVideo}
-                className="absolute top-4 right-4 p-2 bg-red-500 hover:bg-red-600 text-white rounded-lg transition-colors"
+                disabled={deletingVideo}
+                className="absolute top-4 right-4 p-2 bg-red-500 hover:bg-red-600 text-white rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
                 title="Remove video"
                 aria-label="Remove video"
               >
@@ -328,7 +337,8 @@ export default function MediaTab({ profileId, readOnly = false }: MediaTabProps)
                   <div className="absolute inset-0 bg-black bg-opacity-0 group-hover:bg-opacity-40 transition-all rounded-lg flex items-center justify-center">
                     <button
                       onClick={() => handleDeletePhoto(photo)}
-                      className="opacity-0 group-hover:opacity-100 p-3 bg-red-500 hover:bg-red-600 text-white rounded-full transition-all transform scale-90 group-hover:scale-100"
+                      disabled={deletingPhotoId === photo.id}
+                      className="opacity-0 group-hover:opacity-100 p-3 bg-red-500 hover:bg-red-600 text-white rounded-full transition-all transform scale-90 group-hover:scale-100 disabled:opacity-50 disabled:cursor-not-allowed"
                       title="Delete photo"
                       aria-label="Delete photo"
                     >

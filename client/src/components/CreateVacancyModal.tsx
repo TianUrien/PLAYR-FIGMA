@@ -185,6 +185,7 @@ export default function CreateVacancyModal({ isOpen, onClose, onSuccess, editing
           <button
             onClick={onClose}
             className="p-2 hover:bg-gray-100 rounded-lg transition-colors"
+            aria-label="Close modal"
           >
             <X className="w-5 h-5 text-gray-500" />
           </button>
@@ -392,6 +393,7 @@ export default function CreateVacancyModal({ isOpen, onClose, onSuccess, editing
                   <button
                     onClick={() => removeRequirement(index)}
                     className="p-1 text-gray-400 hover:text-red-600 transition-colors"
+                    aria-label="Remove requirement"
                   >
                     <X className="w-4 h-4" />
                   </button>
@@ -492,6 +494,7 @@ export default function CreateVacancyModal({ isOpen, onClose, onSuccess, editing
                     <button
                       onClick={() => removeCustomBenefit(index)}
                       className="hover:text-purple-900"
+                      aria-label="Remove benefit"
                     >
                       <X className="w-3 h-3" />
                     </button>

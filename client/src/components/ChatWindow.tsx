@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef } from 'react'
+import { useState, useEffect, useRef, useCallback } from 'react'
 import { Send, ArrowLeft } from 'lucide-react'
 import { supabase } from '@/lib/supabase'
 import { format } from 'date-fns'
@@ -43,13 +43,45 @@ export default function ChatWindow({ conversation, currentUserId, onBack, onMess
   const messagesEndRef = useRef<HTMLDivElement>(null)
   const inputRef = useRef<HTMLTextAreaElement>(null)
 
+  const fetchMessages = useCallback(async () => {
+    try {
+      const { data, error } = await supabase
+        .from('messages')
+        .select('*')
+        .eq('conversation_id', conversation.id)
+        .order('sent_at', { ascending: true })
+
+      if (error) throw error
+      logger.debug('Fetched messages:', data)
+      setMessages(data || [])
+    } catch (error) {
+      logger.error('Error fetching messages:', error)
+    } finally {
+      setLoading(false)
+    }
+  }, [conversation.id])
+
+  const markMessagesAsRead = useCallback(async () => {
+    try {
+      await supabase
+        .from('messages')
+        .update({ read_at: new Date().toISOString() })
+        .eq('conversation_id', conversation.id)
+        .neq('sender_id', currentUserId)
+        .is('read_at', null)
+
+      onMessageSent()
+    } catch (error) {
+      logger.error('Error marking messages as read:', error)
+    }
+  }, [conversation.id, currentUserId, onMessageSent])
+
   useEffect(() => {
     if (conversation.id) {
       fetchMessages()
       markMessagesAsRead()
     }
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [conversation.id])
+  }, [conversation.id, fetchMessages, markMessagesAsRead])
 
   // Set up real-time subscription for new messages in this conversation
   useEffect(() => {
@@ -99,8 +131,7 @@ export default function ChatWindow({ conversation, currentUserId, onBack, onMess
     return () => {
       supabase.removeChannel(channel)
     }
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [conversation.id, currentUserId])
+  }, [conversation.id, currentUserId, onMessageSent, markMessagesAsRead]) // Fixed: Proper dependencies
 
   // Auto-scroll to bottom when new messages arrive
   useEffect(() => {
@@ -109,39 +140,6 @@ export default function ChatWindow({ conversation, currentUserId, onBack, onMess
 
   const scrollToBottom = () => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' })
-  }
-
-  const fetchMessages = async () => {
-    try {
-      const { data, error } = await supabase
-        .from('messages')
-        .select('*')
-        .eq('conversation_id', conversation.id)
-        .order('sent_at', { ascending: true })
-
-      if (error) throw error
-      logger.debug('Fetched messages:', data)
-      setMessages(data || [])
-    } catch (error) {
-      logger.error('Error fetching messages:', error)
-    } finally {
-      setLoading(false)
-    }
-  }
-
-  const markMessagesAsRead = async () => {
-    try {
-      await supabase
-        .from('messages')
-        .update({ read_at: new Date().toISOString() })
-        .eq('conversation_id', conversation.id)
-        .neq('sender_id', currentUserId)
-        .is('read_at', null)
-
-      onMessageSent()
-    } catch (error) {
-      logger.error('Error marking messages as read:', error)
-    }
   }
 
   const handleSendMessage = async (e: React.FormEvent) => {
@@ -248,6 +246,7 @@ export default function ChatWindow({ conversation, currentUserId, onBack, onMess
         <button
           onClick={onBack}
           className="md:hidden p-2 hover:bg-gray-100 rounded-lg transition-colors"
+          aria-label="Back to conversations"
         >
           <ArrowLeft className="w-5 h-5 text-gray-600" />
         </button>
@@ -358,6 +357,7 @@ export default function ChatWindow({ conversation, currentUserId, onBack, onMess
             type="submit"
             disabled={!newMessage.trim() || sending}
             className="p-3 bg-gradient-to-br from-[#6366f1] to-[#8b5cf6] text-white rounded-xl hover:shadow-lg transition-all disabled:opacity-50 disabled:cursor-not-allowed flex-shrink-0"
+            aria-label="Send message"
           >
             <Send className="w-5 h-5" />
           </button>
