@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useCallback } from 'react'
 import { Video, Plus, Upload, Trash2 } from 'lucide-react'
 import { supabase } from '../lib/supabase'
 import { useAuthStore } from '../lib/auth'
@@ -57,7 +57,7 @@ export default function MediaTab({ profileId, readOnly = false }: MediaTabProps)
   }, [targetUserId, user?.id, authProfile])
 
   // Fetch gallery photos
-  const fetchGalleryPhotos = async () => {
+  const fetchGalleryPhotos = useCallback(async () => {
     if (!targetUserId) return
     
     setIsLoadingPhotos(true)
@@ -75,14 +75,11 @@ export default function MediaTab({ profileId, readOnly = false }: MediaTabProps)
     } finally {
       setIsLoadingPhotos(false)
     }
-  }
+  }, [targetUserId])
 
   useEffect(() => {
-    if (targetUserId) {
-      fetchGalleryPhotos()
-    }
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [targetUserId])
+    fetchGalleryPhotos()
+  }, [fetchGalleryPhotos])
 
   const handlePhotoUpload = async (event: React.ChangeEvent<HTMLInputElement>) => {
     const files = event.target.files

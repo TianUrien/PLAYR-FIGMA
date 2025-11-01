@@ -1,6 +1,7 @@
 import { useState, useEffect, useMemo, useCallback } from 'react'
 import { Search } from 'lucide-react'
 import { Header, MemberCard } from '@/components'
+import { ProfileCardSkeleton } from '@/components/Skeleton'
 import { supabase } from '@/lib/supabase'
 import { requestCache } from '@/lib/requestCache'
 import { monitor } from '@/lib/monitor'
@@ -216,8 +217,10 @@ export default function CommunityPage() {
 
           {/* Loading State */}
           {isLoading ? (
-            <div className="flex items-center justify-center py-12">
-              <div className="w-8 h-8 border-4 border-purple-500 border-t-transparent rounded-full animate-spin" />
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+              {[...Array(12)].map((_, i) => (
+                <ProfileCardSkeleton key={i} />
+              ))}
             </div>
           ) : displayedMembers.length === 0 ? (
             // Empty State

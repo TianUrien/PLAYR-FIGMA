@@ -177,7 +177,7 @@ export default function Header() {
                     onClick={() => setDropdownOpen(!dropdownOpen)}
                     className="flex items-center gap-2 hover:opacity-80 transition-opacity"
                     aria-label="Open user menu"
-                    aria-expanded={dropdownOpen ? 'true' : 'false'}
+                    aria-expanded={dropdownOpen}
                     aria-haspopup="true"
                   >
                     <Avatar

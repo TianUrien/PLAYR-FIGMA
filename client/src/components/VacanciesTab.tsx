@@ -10,11 +10,9 @@ import CreateVacancyModal from './CreateVacancyModal'
 interface VacanciesTabProps {
   profileId?: string
   readOnly?: boolean
-  triggerCreate?: boolean
-  onCreateTriggered?: () => void
 }
 
-export default function VacanciesTab({ profileId, readOnly = false, triggerCreate = false, onCreateTriggered }: VacanciesTabProps) {
+export default function VacanciesTab({ profileId, readOnly = false }: VacanciesTabProps) {
   const { user } = useAuthStore()
   const targetUserId = profileId || user?.id
   const navigate = useNavigate()

@@ -6,6 +6,7 @@ import { useSearchParams } from 'react-router-dom'
 import ConversationList from '@/components/ConversationList'
 import ChatWindow from '@/components/ChatWindow'
 import Header from '@/components/Header'
+import { ConversationSkeleton } from '@/components/Skeleton'
 import { requestCache } from '@/lib/requestCache'
 import { monitor } from '@/lib/monitor'
 import { logger } from '@/lib/logger'
@@ -212,10 +213,31 @@ export default function MessagesPage() {
       <div className="min-h-screen bg-gray-50">
         <Header />
         <div className="flex items-center justify-center" style={{ height: 'calc(100vh - 80px)', paddingTop: '80px' }}>
-          <div className="text-center">
-            <div className="w-12 h-12 border-4 border-purple-500 border-t-transparent rounded-full animate-spin mx-auto mb-4"></div>
-            <p className="text-gray-600">Loading messages...</p>
-          </div>
+          <main className="max-w-7xl mx-auto px-4 md:px-6 w-full">
+            <div className="bg-white rounded-2xl shadow-sm overflow-hidden" style={{ height: 'calc(100vh - 140px)' }}>
+              <div className="flex h-full">
+                {/* Conversation List Skeleton */}
+                <div className="w-full md:w-96 border-r border-gray-200 flex flex-col">
+                  <div className="p-4 border-b border-gray-200">
+                    <div className="h-8 w-32 bg-gray-200 rounded animate-pulse mb-4"></div>
+                    <div className="h-10 bg-gray-100 rounded-lg animate-pulse"></div>
+                  </div>
+                  <div className="flex-1 overflow-y-auto">
+                    {[...Array(8)].map((_, i) => (
+                      <ConversationSkeleton key={i} />
+                    ))}
+                  </div>
+                </div>
+                {/* Empty State Skeleton */}
+                <div className="hidden md:flex flex-1 items-center justify-center bg-gray-50">
+                  <div className="text-center">
+                    <div className="w-16 h-16 bg-gray-200 rounded-full animate-pulse mx-auto mb-4"></div>
+                    <div className="h-6 w-48 bg-gray-200 rounded animate-pulse mx-auto"></div>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </main>
         </div>
       </div>
     )

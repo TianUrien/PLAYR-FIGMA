@@ -224,7 +224,7 @@ export default function CreateVacancyModal({ isOpen, onClose, onSuccess, editing
                     Priority Level
                   </label>
                   <select
-                    value={formData.priority}
+                    value={formData.priority || ''}
                     onChange={(e) => handleInputChange('priority', e.target.value as 'low' | 'medium' | 'high')}
                     className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#10b981] focus:border-transparent bg-white"
                     title="Priority level"
