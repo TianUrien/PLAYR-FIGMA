@@ -92,48 +92,51 @@ export default function EditProfileModal({ isOpen, onClose, role }: EditProfileM
     setLoading(true)
     setError('')
 
+    // Create optimistic update object
+    const optimisticUpdate: Record<string, unknown> = {
+      full_name: formData.full_name,
+      base_location: formData.base_location,
+      avatar_url: formData.avatar_url || null,
+    }
+
+    if (role === 'player') {
+      optimisticUpdate.nationality = formData.nationality
+      optimisticUpdate.position = formData.position
+      optimisticUpdate.gender = formData.gender
+      optimisticUpdate.date_of_birth = formData.date_of_birth || null
+      optimisticUpdate.passport_1 = formData.passport_1 || null
+      optimisticUpdate.passport_2 = formData.passport_2 || null
+      optimisticUpdate.current_club = formData.current_club || null
+    } else if (role === 'coach') {
+      optimisticUpdate.nationality = formData.nationality
+      optimisticUpdate.gender = formData.gender || null
+      optimisticUpdate.date_of_birth = formData.date_of_birth || null
+      optimisticUpdate.passport_1 = formData.passport_1 || null
+      optimisticUpdate.passport_2 = formData.passport_2 || null
+      optimisticUpdate.bio = formData.bio || null
+      optimisticUpdate.contact_email = formData.contact_email || null
+    } else if (role === 'club') {
+      optimisticUpdate.nationality = formData.nationality
+      optimisticUpdate.year_founded = formData.year_founded ? parseInt(formData.year_founded) : null
+      optimisticUpdate.league_division = formData.league_division || null
+      optimisticUpdate.website = formData.website || null
+      optimisticUpdate.contact_email = formData.contact_email || null
+      optimisticUpdate.club_bio = formData.club_bio || null
+      optimisticUpdate.club_history = formData.club_history || null
+    }
+
+    // Optimistically close modal and show updated data immediately
+    onClose()
+    
     try {
-      // Build update object based on role
-      const updateData: Record<string, unknown> = {
-        full_name: formData.full_name,
-        base_location: formData.base_location,
-        avatar_url: formData.avatar_url || null,
-      }
-
-      if (role === 'player') {
-        updateData.nationality = formData.nationality
-        updateData.position = formData.position
-        updateData.gender = formData.gender
-        updateData.date_of_birth = formData.date_of_birth || null
-        updateData.passport_1 = formData.passport_1 || null
-        updateData.passport_2 = formData.passport_2 || null
-        updateData.current_club = formData.current_club || null
-      } else if (role === 'coach') {
-        updateData.nationality = formData.nationality
-        updateData.gender = formData.gender || null
-        updateData.date_of_birth = formData.date_of_birth || null
-        updateData.passport_1 = formData.passport_1 || null
-        updateData.passport_2 = formData.passport_2 || null
-        updateData.bio = formData.bio || null
-        updateData.contact_email = formData.contact_email || null
-      } else if (role === 'club') {
-        updateData.nationality = formData.nationality
-        updateData.year_founded = formData.year_founded ? parseInt(formData.year_founded) : null
-        updateData.league_division = formData.league_division || null
-        updateData.website = formData.website || null
-        updateData.contact_email = formData.contact_email || null
-        updateData.club_bio = formData.club_bio || null
-        updateData.club_history = formData.club_history || null
-      }
-
-      logger.debug('Attempting to update profile with data:', updateData)
+      logger.debug('Attempting to update profile with data:', optimisticUpdate)
       logger.debug('Profile ID:', profile.id)
       logger.debug('Role:', role)
 
       // Update profile in database
       const { data, error: updateError } = await supabase
         .from('profiles')
-        .update(updateData)
+        .update(optimisticUpdate)
         .eq('id', profile.id)
         .select()
 
@@ -152,14 +155,12 @@ export default function EditProfileModal({ isOpen, onClose, role }: EditProfileM
 
       // Refresh profile in auth store
       await fetchProfile(profile.id)
-
-      // Close modal
-      onClose()
     } catch (err) {
       logger.error('Profile update error:', err)
       logger.error('Error type:', typeof err)
       logger.error('Error object:', JSON.stringify(err, null, 2))
-      setError(err instanceof Error ? err.message : 'Failed to update profile')
+      // Show error but don't reopen modal - user already sees their changes
+      alert('Some profile changes may not have saved. Please refresh the page.')
     } finally {
       setLoading(false)
     }

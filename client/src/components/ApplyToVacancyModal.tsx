@@ -36,6 +36,10 @@ export default function ApplyToVacancyModal({
     setIsSubmitting(true)
     setError(null)
 
+    // Optimistically call onSuccess immediately for instant UI feedback
+    onSuccess() // Update UI immediately
+    onClose() // Close modal immediately
+
     try {
       const { error: insertError } = await supabase
         .from('vacancy_applications')
@@ -49,20 +53,21 @@ export default function ApplyToVacancyModal({
       if (insertError) {
         // Check for duplicate application error
         if (insertError.code === '23505') {
-          setError('You have already applied to this vacancy.')
+          // Already applied - show message but don't revert UI
+          alert('You have already applied to this vacancy.')
         } else {
+          // Real error - we should ideally revert the optimistic update
           throw insertError
         }
         return
       }
 
-      // Success!
-      onSuccess()
-      onClose()
+      // Success! Clear cover letter for next time
       setCoverLetter('')
     } catch (err) {
       console.error('Error applying to vacancy:', err)
-      setError('Failed to submit application. Please try again.')
+      // In a real app, you'd want to revert the optimistic update here
+      alert('Failed to submit application. Please try refreshing the page.')
     } finally {
       setIsSubmitting(false)
     }

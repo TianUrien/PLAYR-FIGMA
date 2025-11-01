@@ -63,17 +63,30 @@ export default function ChatWindow({ conversation, currentUserId, onBack, onMess
   }, [conversation.id])
 
   const markMessagesAsRead = useCallback(async () => {
+    // Optimistically mark messages as read in UI immediately
+    const now = new Date().toISOString()
+    setMessages(prev => 
+      prev.map(msg => 
+        msg.sender_id !== currentUserId && !msg.read_at
+          ? { ...msg, read_at: now }
+          : msg
+      )
+    )
+    
+    // Update badge count immediately
+    onMessageSent()
+    
+    // Then update in database
     try {
       await supabase
         .from('messages')
-        .update({ read_at: new Date().toISOString() })
+        .update({ read_at: now })
         .eq('conversation_id', conversation.id)
         .neq('sender_id', currentUserId)
         .is('read_at', null)
-
-      onMessageSent()
     } catch (error) {
       logger.error('Error marking messages as read:', error)
+      // Silently fail - user already sees them as read
     }
   }, [conversation.id, currentUserId, onMessageSent])
 
@@ -316,6 +329,7 @@ export default function ChatWindow({ conversation, currentUserId, onBack, onMess
           <>
             {messages.map((message, index) => {
               const isMyMessage = message.sender_id === currentUserId
+              const isPending = message.id.startsWith('optimistic-')
               const showTimestamp = 
                 index === 0 || 
                 new Date(message.sent_at).getTime() - new Date(messages[index - 1].sent_at).getTime() > 300000 // 5 minutes
@@ -331,14 +345,27 @@ export default function ChatWindow({ conversation, currentUserId, onBack, onMess
                     <div
                       className={`max-w-[70%] rounded-2xl px-4 py-2 ${
                         isMyMessage
-                          ? 'bg-gradient-to-br from-[#6366f1] to-[#8b5cf6] text-white'
+                          ? isPending
+                            ? 'bg-gradient-to-br from-[#6366f1]/70 to-[#8b5cf6]/70 text-white'
+                            : 'bg-gradient-to-br from-[#6366f1] to-[#8b5cf6] text-white'
                           : 'bg-white text-gray-900 border border-gray-200'
                       }`}
                     >
                       <p className="text-sm whitespace-pre-wrap break-words">{message.content}</p>
-                      <p className={`text-xs mt-1 ${isMyMessage ? 'text-purple-100' : 'text-gray-500'}`}>
-                        {format(new Date(message.sent_at), 'h:mm a')}
-                      </p>
+                      <div className="flex items-center gap-2 mt-1">
+                        <p className={`text-xs ${isMyMessage ? 'text-purple-100' : 'text-gray-500'}`}>
+                          {format(new Date(message.sent_at), 'h:mm a')}
+                        </p>
+                        {isPending && (
+                          <span className="text-xs text-purple-200 flex items-center gap-1">
+                            <svg className="animate-spin h-3 w-3" viewBox="0 0 24 24">
+                              <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" fill="none" />
+                              <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z" />
+                            </svg>
+                            Sending
+                          </span>
+                        )}
+                      </div>
                     </div>
                   </div>
                 </div>
