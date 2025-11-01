@@ -90,7 +90,7 @@ export default function Landing() {
         <div className="flex-1 flex flex-col justify-center px-6 py-12 sm:px-8 md:px-12 lg:px-16 xl:px-24">
           <div className="max-w-2xl mx-auto lg:mx-0 text-center lg:text-left">
             <img 
-              src="/LogoWhite.webp" 
+              src="/WhiteLogo.svg" 
               alt="PLAYR" 
               className="h-16 sm:h-20 lg:h-24 xl:h-32 mb-6 object-contain mx-auto lg:mx-0"
               fetchPriority="high"
