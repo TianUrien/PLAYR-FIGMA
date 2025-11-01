@@ -12,6 +12,7 @@ interface VacancyDetailViewProps {
   onClose: () => void
   onApply?: () => void
   hasApplied?: boolean
+  hideClubProfileButton?: boolean
 }
 
 const BENEFIT_ICONS: Record<string, React.ComponentType<{ className?: string }>> = {
@@ -32,7 +33,8 @@ export default function VacancyDetailView({
   clubId,
   onClose,
   onApply,
-  hasApplied = false
+  hasApplied = false,
+  hideClubProfileButton = false
 }: VacancyDetailViewProps) {
   const navigate = useNavigate()
 
@@ -307,13 +309,15 @@ export default function VacancyDetailView({
                   Close
                 </Button>
               )}
-              <Button
-                onClick={handleClubClick}
-                variant="outline"
-                className="sm:w-auto"
-              >
-                View Club Profile
-              </Button>
+              {!hideClubProfileButton && (
+                <Button
+                  onClick={handleClubClick}
+                  variant="outline"
+                  className="sm:w-auto"
+                >
+                  View Club Profile
+                </Button>
+              )}
             </div>
 
             {/* Timestamp */}

@@ -1,11 +1,13 @@
 import { useState, useEffect, useCallback } from 'react'
-import { Plus, Edit2, Copy, Archive, MapPin, Calendar, Users } from 'lucide-react'
+import { Plus, Edit2, Copy, Archive, MapPin, Calendar, Users, Eye } from 'lucide-react'
 import { useNavigate } from 'react-router-dom'
 import { supabase } from '../lib/supabase'
 import { useAuthStore } from '../lib/auth'
 import type { Vacancy } from '../lib/database.types'
 import Button from './Button'
 import CreateVacancyModal from './CreateVacancyModal'
+import ApplyToVacancyModal from './ApplyToVacancyModal'
+import VacancyDetailView from './VacancyDetailView'
 
 interface VacanciesTabProps {
   profileId?: string
@@ -13,15 +15,26 @@ interface VacanciesTabProps {
 }
 
 export default function VacanciesTab({ profileId, readOnly = false }: VacanciesTabProps) {
-  const { user } = useAuthStore()
+  const { user, profile } = useAuthStore()
   const targetUserId = profileId || user?.id
   const navigate = useNavigate()
   const [vacancies, setVacancies] = useState<Vacancy[]>([])
   const [applicantCounts, setApplicantCounts] = useState<Record<string, number>>({})
+  const [userApplications, setUserApplications] = useState<Set<string>>(new Set())
   const [isLoading, setIsLoading] = useState(true)
   const [showModal, setShowModal] = useState(false)
   const [editingVacancy, setEditingVacancy] = useState<Vacancy | null>(null)
   const [actionLoading, setActionLoading] = useState<string | null>(null) // Track which vacancy action is loading
+  
+  // Apply modal state
+  const [showApplyModal, setShowApplyModal] = useState(false)
+  const [selectedVacancy, setSelectedVacancy] = useState<Vacancy | null>(null)
+  
+  // Detail modal state
+  const [showDetailModal, setShowDetailModal] = useState(false)
+  const [detailVacancy, setDetailVacancy] = useState<Vacancy | null>(null)
+  const [clubName, setClubName] = useState<string>('')
+  const [clubLogo, setClubLogo] = useState<string | null>(null)
 
   const fetchVacancies = useCallback(async () => {
     if (!targetUserId) return
@@ -69,6 +82,79 @@ export default function VacanciesTab({ profileId, readOnly = false }: VacanciesT
       setIsLoading(false)
     }
   }, [targetUserId, readOnly, user])
+
+  // Fetch user's applications to check which vacancies they've applied to
+  const fetchUserApplications = useCallback(async () => {
+    if (!user || !readOnly) return // Only fetch when in readOnly mode (public view)
+
+    try {
+      const { data, error } = await supabase
+        .from('vacancy_applications')
+        .select('vacancy_id')
+        .eq('player_id', user.id)
+
+      if (error) throw error
+      
+      const appliedVacancyIds = new Set(data?.map(app => app.vacancy_id) || [])
+      setUserApplications(appliedVacancyIds)
+    } catch (error) {
+      console.error('Error fetching user applications:', error)
+    }
+  }, [user, readOnly])
+
+  useEffect(() => {
+    if (targetUserId) {
+      fetchVacancies()
+      fetchUserApplications()
+    }
+  }, [targetUserId, fetchVacancies, fetchUserApplications])
+
+  const handleApply = (vacancy: Vacancy) => {
+    if (!user) {
+      // Redirect to login with return URL
+      const returnUrl = window.location.pathname
+      navigate(`/signup?redirect=${encodeURIComponent(returnUrl)}`)
+      return
+    }
+
+    setSelectedVacancy(vacancy)
+    setShowApplyModal(true)
+  }
+
+  const canUserApply = (vacancy: Vacancy): boolean => {
+    if (!user || !profile) return false
+    
+    // Check if user role matches vacancy type
+    if (vacancy.opportunity_type === 'player' && profile.role !== 'player') return false
+    if (vacancy.opportunity_type === 'coach' && profile.role !== 'coach') return false
+    
+    // Clubs cannot apply
+    if (profile.role === 'club') return false
+    
+    return true
+  }
+
+  const handleViewDetails = async (vacancy: Vacancy) => {
+    setDetailVacancy(vacancy)
+    setShowDetailModal(true)
+
+    // Fetch club details
+    try {
+      const { data: clubData } = await supabase
+        .from('profiles')
+        .select('full_name, avatar_url')
+        .eq('id', vacancy.club_id)
+        .single()
+
+      if (clubData) {
+        setClubName(clubData.full_name || 'Unknown Club')
+        setClubLogo(clubData.avatar_url)
+      }
+    } catch (error) {
+      console.error('Error fetching club details:', error)
+      setClubName('Unknown Club')
+    }
+  }
 
   useEffect(() => {
     if (targetUserId) {
@@ -295,6 +381,56 @@ export default function VacanciesTab({ profileId, readOnly = false }: VacanciesT
                 </button>
               )}
 
+              {/* Apply Button - Public View */}
+              {readOnly && vacancy.status === 'open' && (
+                <div className="pt-4 border-t border-gray-200">
+                  <div className="flex items-center gap-2">
+                    {!user ? (
+                      // Not logged in - show sign in prompt
+                      <button
+                        onClick={() => handleApply(vacancy)}
+                        className="flex-1 flex items-center justify-center gap-2 px-4 py-3 text-sm font-semibold text-white bg-gradient-to-br from-[#6366f1] to-[#8b5cf6] hover:shadow-lg rounded-lg transition-all"
+                      >
+                        Sign in to Apply
+                      </button>
+                    ) : userApplications.has(vacancy.id) ? (
+                      // Already applied
+                      <button
+                        disabled
+                        className="flex-1 flex items-center justify-center gap-2 px-4 py-3 text-sm font-semibold text-green-700 bg-green-50 rounded-lg cursor-not-allowed"
+                      >
+                        ✓ Applied
+                      </button>
+                    ) : canUserApply(vacancy) ? (
+                      // Can apply
+                      <button
+                        onClick={() => handleApply(vacancy)}
+                        className="flex-1 flex items-center justify-center gap-2 px-4 py-3 text-sm font-semibold text-white bg-gradient-to-br from-[#6366f1] to-[#8b5cf6] hover:shadow-lg rounded-lg transition-all"
+                      >
+                        Apply Now
+                      </button>
+                    ) : (
+                      // Cannot apply (wrong role)
+                      <div className="flex-1 px-4 py-3 text-sm text-center text-gray-500 bg-gray-50 rounded-lg">
+                        {vacancy.opportunity_type === 'player' 
+                          ? 'Available for Player accounts only'
+                          : 'Available for Coach accounts only'}
+                      </div>
+                    )}
+                    
+                    {/* View Details Button (Eye Icon) */}
+                    <button
+                      onClick={() => handleViewDetails(vacancy)}
+                      className="p-3 text-gray-600 hover:text-gray-900 hover:bg-gray-100 rounded-lg transition-all"
+                      title="View details"
+                      aria-label="View vacancy details"
+                    >
+                      <Eye className="w-5 h-5" />
+                    </button>
+                  </div>
+                </div>
+              )}
+
               {/* Actions */}
               {!readOnly && (
                 <div className="flex items-center gap-2 pt-4 border-t border-gray-200">
@@ -354,6 +490,47 @@ export default function VacanciesTab({ profileId, readOnly = false }: VacanciesT
         onSuccess={fetchVacancies}
         editingVacancy={editingVacancy}
       />
+
+      {/* Apply Modal */}
+      {selectedVacancy && (
+        <ApplyToVacancyModal
+          isOpen={showApplyModal}
+          onClose={() => {
+            setShowApplyModal(false)
+            setSelectedVacancy(null)
+          }}
+          vacancy={selectedVacancy}
+          onSuccess={() => {
+            // Add this vacancy to the applied set
+            setUserApplications(prev => new Set([...prev, selectedVacancy.id]))
+          }}
+        />
+      )}
+
+      {/* Vacancy Detail Modal */}
+      {detailVacancy && showDetailModal && (
+        <VacancyDetailView
+          vacancy={detailVacancy}
+          clubName={clubName}
+          clubLogo={clubLogo}
+          clubId={detailVacancy.club_id}
+          onClose={() => {
+            setShowDetailModal(false)
+            setDetailVacancy(null)
+          }}
+          onApply={
+            user && (profile?.role === 'player' || profile?.role === 'coach') && canUserApply(detailVacancy)
+              ? () => {
+                  setShowDetailModal(false)
+                  setSelectedVacancy(detailVacancy)
+                  setShowApplyModal(true)
+                }
+              : undefined
+          }
+          hasApplied={userApplications.has(detailVacancy.id)}
+          hideClubProfileButton={true}
+        />
+      )}
     </div>
   )
 }
