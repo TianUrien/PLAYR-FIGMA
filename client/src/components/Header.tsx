@@ -112,7 +112,7 @@ export default function Header() {
               className="flex items-center gap-2 hover:opacity-80 transition-opacity"
             >
               <img 
-                src="/PLAYR Logo Black.svg" 
+                src="/New-LogoBlack.svg" 
                 alt="PLAYR" 
                 className="h-8"
               />
