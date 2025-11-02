@@ -1,11 +1,13 @@
 import { useEffect, lazy, Suspense } from 'react'
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom'
 import { initializeAuth } from '@/lib/auth'
-import { ProtectedRoute, ErrorBoundary } from '@/components'
+import { ProtectedRoute, ErrorBoundary, Layout } from '@/components'
 import Landing from '@/pages/Landing'
 import SignUp from '@/pages/SignUp'
 import AuthCallback from '@/pages/AuthCallback'
 import VerifyEmail from '@/pages/VerifyEmail'
+import PrivacyPolicy from '@/pages/PrivacyPolicy'
+import Terms from '@/pages/Terms'
 
 // Lazy load heavy components
 const CompleteProfile = lazy(() => import('@/pages/CompleteProfile'))
@@ -39,31 +41,35 @@ function App() {
     <ErrorBoundary>
       <BrowserRouter>
         <ProtectedRoute>
-          <Suspense fallback={<PageLoader />}>
-            <Routes>
-              {/* Public Routes (allowlisted in ProtectedRoute) */}
-              <Route path="/" element={<Landing />} />
-              <Route path="/signup" element={<SignUp />} />
-              <Route path="/auth/callback" element={<AuthCallback />} />
-              <Route path="/verify-email" element={<VerifyEmail />} />
-              
-              {/* Protected Routes (require authentication) - Lazy loaded */}
-              <Route path="/complete-profile" element={<CompleteProfile />} />
-              <Route path="/community" element={<CommunityPage />} />
-              <Route path="/opportunities" element={<OpportunitiesPage />} />
-              <Route path="/opportunities/:id" element={<OpportunityDetailPage />} />
-              <Route path="/messages" element={<MessagesPage />} />
-              <Route path="/dashboard/profile" element={<DashboardRouter />} />
-              <Route path="/dashboard/club/vacancies/:vacancyId/applicants" element={<ApplicantsList />} />
-              <Route path="/players/:username" element={<PublicPlayerProfile />} />
-              <Route path="/players/id/:id" element={<PublicPlayerProfile />} />
-              <Route path="/clubs/:username" element={<PublicClubProfile />} />
-              <Route path="/clubs/id/:id" element={<PublicClubProfile />} />
-              
-              {/* Fallback */}
-              <Route path="*" element={<Navigate to="/" replace />} />
-            </Routes>
-          </Suspense>
+          <Layout>
+            <Suspense fallback={<PageLoader />}>
+              <Routes>
+                {/* Public Routes (allowlisted in ProtectedRoute) */}
+                <Route path="/" element={<Landing />} />
+                <Route path="/signup" element={<SignUp />} />
+                <Route path="/auth/callback" element={<AuthCallback />} />
+                <Route path="/verify-email" element={<VerifyEmail />} />
+                <Route path="/privacy-policy" element={<PrivacyPolicy />} />
+                <Route path="/terms" element={<Terms />} />
+                
+                {/* Protected Routes (require authentication) - Lazy loaded */}
+                <Route path="/complete-profile" element={<CompleteProfile />} />
+                <Route path="/community" element={<CommunityPage />} />
+                <Route path="/opportunities" element={<OpportunitiesPage />} />
+                <Route path="/opportunities/:id" element={<OpportunityDetailPage />} />
+                <Route path="/messages" element={<MessagesPage />} />
+                <Route path="/dashboard/profile" element={<DashboardRouter />} />
+                <Route path="/dashboard/club/vacancies/:vacancyId/applicants" element={<ApplicantsList />} />
+                <Route path="/players/:username" element={<PublicPlayerProfile />} />
+                <Route path="/players/id/:id" element={<PublicPlayerProfile />} />
+                <Route path="/clubs/:username" element={<PublicClubProfile />} />
+                <Route path="/clubs/id/:id" element={<PublicClubProfile />} />
+                
+                {/* Fallback */}
+                <Route path="*" element={<Navigate to="/" replace />} />
+              </Routes>
+            </Suspense>
+          </Layout>
         </ProtectedRoute>
       </BrowserRouter>
     </ErrorBoundary>

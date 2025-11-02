@@ -203,7 +203,7 @@ export default function MessagesPage() {
   }, [user?.id, fetchConversations]) // Fixed: Use user?.id instead of user object
 
   const filteredConversations = conversations.filter((conv) =>
-    conv.otherParticipant?.full_name.toLowerCase().includes(searchQuery.toLowerCase())
+    conv.otherParticipant?.full_name?.toLowerCase().includes(searchQuery.toLowerCase())
   )
 
   const selectedConversation = conversations.find((conv) => conv.id === selectedConversationId)

@@ -35,7 +35,7 @@ export default function MemberCard({
 
   // Title case formatter
   const toTitleCase = (str: string | null) => {
-    if (!str) return null
+    if (!str) return ''
     return str
       .split(' ')
       .map(word => word.charAt(0).toUpperCase() + word.slice(1).toLowerCase())
@@ -110,7 +110,7 @@ export default function MemberCard({
       <div className="flex items-center gap-4 mb-4">
         <Avatar
           src={avatar_url}
-          initials={full_name.split(' ').map(n => n[0]).join('')}
+          initials={full_name ? full_name.split(' ').map(n => n[0]).join('') : '?'}
           size="lg"
         />
         <div className="flex-1 min-w-0">
