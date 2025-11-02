@@ -1,12 +1,11 @@
 import { useState, useEffect, useRef, useCallback } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { Menu, X, MessageCircle, LogOut, Trash2, Users, Briefcase, LayoutDashboard } from 'lucide-react'
+import { Menu, X, MessageCircle, LogOut, Users, Briefcase, LayoutDashboard, Settings } from 'lucide-react'
 import { Avatar } from '@/components'
 import { useAuthStore } from '@/lib/auth'
 import { supabase } from '@/lib/supabase'
 import { monitor } from '@/lib/monitor'
 import { requestCache, generateCacheKey } from '@/lib/requestCache'
-import DeleteAccountModal from './DeleteAccountModal'
 
 export default function Header() {
   const navigate = useNavigate()
@@ -14,7 +13,6 @@ export default function Header() {
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false)
   const [unreadCount, setUnreadCount] = useState(0)
   const [dropdownOpen, setDropdownOpen] = useState(false)
-  const [deleteModalOpen, setDeleteModalOpen] = useState(false)
   const dropdownRef = useRef<HTMLDivElement>(null)
 
     // Fetch unread message count
@@ -198,24 +196,24 @@ export default function Header() {
                       <button
                         onClick={() => {
                           setDropdownOpen(false)
-                          handleSignOut()
+                          navigate('/settings')
                         }}
                         className="w-full text-left px-4 py-2 text-sm text-gray-700 hover:bg-gray-50 transition-colors flex items-center gap-2"
                         role="menuitem"
                       >
-                        <LogOut className="w-4 h-4" />
-                        Sign Out
+                        <Settings className="w-4 h-4" />
+                        Settings
                       </button>
                       <button
                         onClick={() => {
                           setDropdownOpen(false)
-                          setDeleteModalOpen(true)
+                          handleSignOut()
                         }}
                         className="w-full text-left px-4 py-2 text-sm text-red-600 hover:bg-red-50 transition-colors flex items-center gap-2"
                         role="menuitem"
                       >
-                        <Trash2 className="w-4 h-4" />
-                        Delete Account
+                        <LogOut className="w-4 h-4" />
+                        Sign Out
                       </button>
                     </div>
                   )}
@@ -325,14 +323,14 @@ export default function Header() {
                 </button>
                 <button
                   onClick={() => {
-                    navigate('/dashboard/profile')
+                    navigate('/settings')
                     setMobileMenuOpen(false)
                   }}
                   className="w-full text-left px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50 rounded-lg"
                 >
                   <div className="flex items-center gap-2">
-                    <LayoutDashboard className="w-5 h-5" />
-                    <span>Dashboard</span>
+                    <Settings className="w-5 h-5" />
+                    <span>Settings</span>
                   </div>
                 </button>
                 <button
@@ -340,23 +338,11 @@ export default function Header() {
                     handleSignOut()
                     setMobileMenuOpen(false)
                   }}
-                  className="w-full text-left px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50 rounded-lg"
+                  className="w-full text-left px-4 py-2 text-sm font-medium text-red-600 hover:bg-red-50 rounded-lg"
                 >
                   <div className="flex items-center gap-2">
                     <LogOut className="w-4 h-4" />
                     <span>Sign Out</span>
-                  </div>
-                </button>
-                <button
-                  onClick={() => {
-                    setMobileMenuOpen(false)
-                    setDeleteModalOpen(true)
-                  }}
-                  className="w-full text-left px-4 py-2 text-sm font-medium text-red-600 hover:bg-red-50 rounded-lg"
-                >
-                  <div className="flex items-center gap-2">
-                    <Trash2 className="w-4 h-4" />
-                    <span>Delete Account</span>
                   </div>
                 </button>
               </div>
@@ -409,15 +395,6 @@ export default function Header() {
           </div>
         )}
       </nav>
-
-      {/* Delete Account Modal */}
-      {user && (
-        <DeleteAccountModal
-          isOpen={deleteModalOpen}
-          onClose={() => setDeleteModalOpen(false)}
-          userEmail={user.email || ''}
-        />
-      )}
     </header>
   )
 }

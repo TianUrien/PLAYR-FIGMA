@@ -8,6 +8,7 @@ import AuthCallback from '@/pages/AuthCallback'
 import VerifyEmail from '@/pages/VerifyEmail'
 import PrivacyPolicy from '@/pages/PrivacyPolicy'
 import Terms from '@/pages/Terms'
+import SettingsPage from '@/pages/SettingsPage'
 
 // Lazy load heavy components
 const CompleteProfile = lazy(() => import('@/pages/CompleteProfile'))
@@ -58,6 +59,7 @@ function App() {
                 <Route path="/opportunities" element={<OpportunitiesPage />} />
                 <Route path="/opportunities/:id" element={<OpportunityDetailPage />} />
                 <Route path="/messages" element={<MessagesPage />} />
+                <Route path="/settings" element={<SettingsPage />} />
                 <Route path="/dashboard/profile" element={<DashboardRouter />} />
                 <Route path="/dashboard/club/vacancies/:vacancyId/applicants" element={<ApplicantsList />} />
                 <Route path="/players/:username" element={<PublicPlayerProfile />} />

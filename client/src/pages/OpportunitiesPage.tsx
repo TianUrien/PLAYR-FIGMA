@@ -60,45 +60,43 @@ export default function OpportunitiesPage() {
         const { vacanciesData, clubsMap } = await requestCache.dedupe(
           'open-vacancies',
           async () => {
-            // Fetch all open vacancies
+            // Fetch vacancies with club data in a single query using JOIN
             const { data: vacanciesData, error: vacanciesError } = await supabase
               .from('vacancies')
-              .select('*')
+              .select(`
+                *,
+                club:profiles!vacancies_club_id_fkey(
+                  id,
+                  full_name,
+                  avatar_url
+                )
+              `)
               .eq('status', 'open')
               .order('created_at', { ascending: false })
+              .limit(100) // Limit to 100 most recent vacancies
 
             if (vacanciesError) throw vacanciesError
 
-            logger.debug('Fetched vacancies:', vacanciesData)
+            logger.debug('Fetched vacancies with clubs:', vacanciesData)
 
-            // Fetch club details
+            // Build clubs map from embedded data
             const clubsMap: Record<string, { id: string; full_name: string; avatar_url: string | null }> = {}
             
-            if (vacanciesData && vacanciesData.length > 0) {
-              const clubIds = [...new Set(vacanciesData.map((v: Vacancy) => v.club_id))]
-              logger.debug('Fetching clubs for IDs:', clubIds)
-              
-              const { data: clubsData, error: clubsError } = await supabase
-                .from('profiles')
-                .select('id, full_name, avatar_url')
-                .in('id', clubIds)
-
-              if (clubsError) {
-                logger.error('Error fetching clubs:', clubsError)
-                throw clubsError
+            vacanciesData?.forEach((vacancy: any) => {
+              if (vacancy.club && vacancy.club.id) {
+                clubsMap[vacancy.club.id] = {
+                  id: vacancy.club.id,
+                  full_name: vacancy.club.full_name,
+                  avatar_url: vacancy.club.avatar_url,
+                }
               }
+            })
 
-              logger.debug('Fetched clubs:', clubsData)
-
-              clubsData?.forEach((club: { id: string; full_name: string; avatar_url: string | null }) => {
-                clubsMap[club.id] = club
-              })
-              logger.debug('Clubs map:', clubsMap)
-            }
+            logger.debug('Clubs map:', clubsMap)
 
             return { vacanciesData, clubsMap }
           },
-          20000 // 20 second cache for vacancies
+          5000 // 5 second cache for vacancies (reduced from 20s)
         )
 
         setVacancies((vacanciesData as Vacancy[]) || [])
