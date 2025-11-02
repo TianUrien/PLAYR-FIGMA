@@ -55,7 +55,7 @@ export default function CreateVacancyModal({ isOpen, onClose, onSuccess, editing
 
   if (!isOpen) return null
 
-  const handleInputChange = (field: keyof VacancyInsert, value: any) => {
+  const handleInputChange = (field: keyof VacancyInsert, value: VacancyInsert[typeof field]) => {
     setFormData(prev => ({ ...prev, [field]: value }))
     // Clear error for this field
     if (errors[field]) {

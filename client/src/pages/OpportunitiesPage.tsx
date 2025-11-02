@@ -82,7 +82,7 @@ export default function OpportunitiesPage() {
             // Build clubs map from embedded data
             const clubsMap: Record<string, { id: string; full_name: string; avatar_url: string | null }> = {}
             
-            vacanciesData?.forEach((vacancy: any) => {
+            vacanciesData?.forEach((vacancy: Vacancy & { club?: { id: string; full_name: string; avatar_url: string | null } }) => {
               if (vacancy.club && vacancy.club.id) {
                 clubsMap[vacancy.club.id] = {
                   id: vacancy.club.id,

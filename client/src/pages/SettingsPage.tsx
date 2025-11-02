@@ -54,8 +54,9 @@ export default function SettingsPage() {
 
       // Auto-hide success message after 3 seconds
       setTimeout(() => setPasswordSuccess(false), 3000)
-    } catch (error: any) {
-      setPasswordError(error.message || 'Failed to update password')
+    } catch (error: unknown) {
+      const errorMessage = error instanceof Error ? error.message : 'Failed to update password'
+      setPasswordError(errorMessage)
     } finally {
       setPasswordLoading(false)
     }

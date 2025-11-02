@@ -12,9 +12,11 @@ import VacancyDetailView from './VacancyDetailView'
 interface VacanciesTabProps {
   profileId?: string
   readOnly?: boolean
+  triggerCreate?: boolean
+  onCreateTriggered?: () => void
 }
 
-export default function VacanciesTab({ profileId, readOnly = false }: VacanciesTabProps) {
+export default function VacanciesTab({ profileId, readOnly = false, triggerCreate, onCreateTriggered }: VacanciesTabProps) {
   const { user, profile } = useAuthStore()
   const targetUserId = profileId || user?.id
   const navigate = useNavigate()
@@ -108,6 +110,15 @@ export default function VacanciesTab({ profileId, readOnly = false }: VacanciesT
       fetchUserApplications()
     }
   }, [targetUserId, fetchVacancies, fetchUserApplications])
+
+  // Handle external trigger to create vacancy
+  useEffect(() => {
+    if (triggerCreate) {
+      setShowModal(true)
+      setEditingVacancy(null)
+      onCreateTriggered?.()
+    }
+  }, [triggerCreate, onCreateTriggered])
 
   const handleApply = (vacancy: Vacancy) => {
     if (!user) {
