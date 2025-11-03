@@ -45,6 +45,7 @@ export default function CommunityPage() {
             const { data, error } = await supabase
               .from('profiles')
               .select('id, avatar_url, full_name, role, nationality, base_location, position, current_club, created_at')
+              .eq('onboarding_completed', true) // Only show fully onboarded users
               .order('created_at', { ascending: false })
               .limit(200) // Load reasonable batch for client-side filtering
 
@@ -85,6 +86,7 @@ export default function CommunityPage() {
             const { data, error } = await supabase
               .from('profiles')
               .select('id, avatar_url, full_name, role, nationality, base_location, position, current_club, created_at')
+              .eq('onboarding_completed', true) // Only show fully onboarded users
               .or(
                 `full_name.ilike.${searchTerm},nationality.ilike.${searchTerm},base_location.ilike.${searchTerm},position.ilike.${searchTerm},current_club.ilike.${searchTerm}`
               )

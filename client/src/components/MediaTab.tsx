@@ -193,7 +193,7 @@ export default function MediaTab({ profileId, readOnly = false }: MediaTabProps)
 
       if (error) throw error
 
-      await fetchProfile(user.id)
+  await fetchProfile(user.id, { force: true })
     } catch (error) {
       console.error('Error deleting video:', error)
       alert('Failed to remove video. Please try again.')

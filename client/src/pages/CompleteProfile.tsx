@@ -1,30 +1,40 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { User, MapPin, Globe, Calendar, Building2 } from 'lucide-react'
+import { User, MapPin, Globe, Calendar, Building2, Camera } from 'lucide-react'
 import { Input, Button } from '@/components'
 import { supabase } from '@/lib/supabase'
 import { useAuthStore } from '@/lib/auth'
 import { logger } from '@/lib/logger'
+import { optimizeImage, validateImage } from '@/lib/imageOptimization'
 
 type UserRole = 'player' | 'coach' | 'club'
 
 /**
  * CompleteProfile - Step 2 of signup (POST email verification)
  * 
+ * SIMPLIFIED APPROACH:
+ * - Uses global auth store (useAuthStore) for user and profile data
+ * - No duplicate profile fetching (auth store handles it)
+ * - No complex profile creation logic (DB trigger handles it)
+ * - Focus on form submission and data update only
+ * 
  * Flow:
- * 1. User has verified email and active session
- * 2. Profile row exists from DB trigger (id, email, role)
- * 3. User fills long form with complete details
- * 4. Update profile row with full data
- * 5. Redirect to dashboard
+ * 1. User has verified email and active session (from AuthCallback)
+ * 2. Auth store has fetched profile (from initializeAuth)
+ * 3. User fills form with complete details
+ * 4. Update profile row with full data + onboarding_completed flag
+ * 5. Refresh auth store and navigate to dashboard
  */
 export default function CompleteProfile() {
   const navigate = useNavigate()
+  const fileInputRef = useRef<HTMLInputElement>(null)
+  const { user, profile, loading: authLoading, profileStatus } = useAuthStore()
   const [loading, setLoading] = useState(false)
-  const [checkingProfile, setCheckingProfile] = useState(true)
   const [error, setError] = useState('')
-  const [userRole, setUserRole] = useState<UserRole | null>(null)
-  const [userId, setUserId] = useState<string>('')
+  const [avatarUrl, setAvatarUrl] = useState<string>('')
+  const [uploadingAvatar, setUploadingAvatar] = useState(false)
+  const [fallbackRole, setFallbackRole] = useState<UserRole | null>(null)
+  const [fallbackEmail, setFallbackEmail] = useState<string>('')
 
   // Form data states
   const [formData, setFormData] = useState({
@@ -46,125 +56,105 @@ export default function CompleteProfile() {
     clubHistory: '',
   })
 
+  // Use profile data from auth store - no need to fetch again
+  const userRole = (profile?.role as UserRole | null) ?? fallbackRole ?? (user?.user_metadata?.role as UserRole | undefined) ?? null
+  const profileEmail = profile?.email ?? user?.email ?? fallbackEmail ?? ''
+
   useEffect(() => {
-    const checkSession = async () => {
-      try {
-        const { data: { session } } = await supabase.auth.getSession()
-
-        if (!session) {
-          logger.error('No session found in CompleteProfile')
-          navigate('/signup')
-          return
-        }
-
-        setUserId(session.user.id)
-
-        // Fetch existing profile
-        const { data: profile, error: profileError } = await supabase
-          .from('profiles')
-          .select('role, full_name, email')
-          .eq('id', session.user.id)
-          .single()
-
-                // If profile doesn't exist (PGRST116), create it with retry logic
-        if (profileError && profileError.code === 'PGRST116') {
-          logger.debug('Profile not found, creating basic profile with retry')
-          
-          // Get role from user metadata or localStorage
-          const role = session.user.user_metadata?.role || localStorage.getItem('pending_role') || 'player'
-          
-          // Retry logic: try up to 3 times with exponential backoff
-          let insertError = null
-          for (let attempt = 1; attempt <= 3; attempt++) {
-            logger.debug(`Profile creation attempt ${attempt}/3`)
-            
-            // Create basic profile (type assertion needed until DB types are regenerated after migration)
-            const { error } = await supabase
-              .from('profiles')
-              .insert({
-                id: session.user.id,
-                email: session.user.email!,
-                role: role,
-                full_name: null,
-                base_location: null,
-                nationality: null
-              } as unknown as never)
-
-            if (!error) {
-              logger.debug(`Basic profile created successfully on attempt ${attempt}`)
-              setUserRole(role as UserRole)
-              setFormData(prev => ({ ...prev, contactEmail: session.user.email || '' }))
-              setCheckingProfile(false)
-              return
-            }
-            
-            // If conflict error (23505), profile already exists - fetch it
-            if (error.code === '23505') {
-              logger.debug('Profile already exists (conflict), fetching it')
-              const { data: existingProfile } = await supabase
-                .from('profiles')
-                .select('role, full_name, email')
-                .eq('id', session.user.id)
-                .single()
-              
-              if (existingProfile) {
-                setUserRole(existingProfile.role as UserRole)
-                setFormData(prev => ({ ...prev, contactEmail: existingProfile.email || '' }))
-                setCheckingProfile(false)
-                return
-              }
-            }
-            
-            insertError = error
-            
-            // Exponential backoff: wait 1s, 2s, 4s before retry
-            if (attempt < 3) {
-              const delay = Math.pow(2, attempt - 1) * 1000
-              logger.debug(`Waiting ${delay}ms before retry...`)
-              await new Promise(resolve => setTimeout(resolve, delay))
-            }
-          }
-
-          // All retries failed
-          logger.error('Error creating profile after 3 attempts:', insertError)
-          setError('Could not create your profile. Please refresh the page and try again, or contact support if this persists.')
-          setCheckingProfile(false)
-          return
-        }
-
-        if (profileError) {
-          logger.error('Error fetching profile:', profileError)
-          setError('Could not load your profile. Please try again.')
-          setCheckingProfile(false)
-          return
-        }
-
-        if (!profile) {
-          logger.error('Profile not found and could not be created')
-          setError('Profile not found. Please contact support.')
-          setCheckingProfile(false)
-          return
-        }
-
-        // Set role from profile (removed auto-redirect to prevent loop)
-        // DashboardRouter will handle routing for complete profiles
-        setUserRole(profile.role as UserRole)
-        
-        // Pre-fill email if available
-        if (profile.email) {
-          setFormData(prev => ({ ...prev, contactEmail: profile.email }))
-        }
-
-      } catch (err) {
-        logger.error('Error checking session:', err)
-        setError('Something went wrong. Please try again.')
-      } finally {
-        setCheckingProfile(false)
+    if (typeof window !== 'undefined') {
+      const storedRole = window.localStorage.getItem('pending_role') as UserRole | null
+      const storedEmail = window.localStorage.getItem('pending_email') || ''
+      if (storedRole && !fallbackRole) {
+        setFallbackRole(storedRole)
+      }
+      if (storedEmail && !fallbackEmail) {
+        setFallbackEmail(storedEmail)
       }
     }
+  }, [fallbackRole, fallbackEmail])
 
-    checkSession()
-  }, [navigate])
+  useEffect(() => {
+    console.log('[COMPLETE_PROFILE]', {
+      authLoading,
+      hasUser: !!user,
+      hasProfile: !!profile,
+      role: profile?.role,
+      fullName: profile?.full_name,
+      profileStatus
+    })
+
+    // Wait for auth to load
+    if (authLoading || (profileStatus === 'fetching' && !profile)) return
+
+    // No user → redirect to signup
+    if (!user) {
+      console.log('[COMPLETE_PROFILE] No user, redirecting to signup')
+      navigate('/signup', { replace: true })
+      return
+    }
+
+    // Pre-fill email if available
+    if (profileEmail) {
+      setFormData(prev => ({ ...prev, contactEmail: profileEmail }))
+    }
+  }, [user, profile, authLoading, navigate, profileStatus, profileEmail])
+
+  useEffect(() => {
+    if (authLoading) return
+    if (profile?.full_name) {
+      logger.debug('[COMPLETE_PROFILE] Profile complete, navigating to dashboard')
+      navigate('/dashboard/profile', { replace: true })
+    }
+  }, [authLoading, profile?.full_name, navigate, profile])
+
+  // Handle avatar upload
+  const handleAvatarUpload = async (event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0]
+    if (!file || !user) return
+
+    try {
+      setUploadingAvatar(true)
+      setError('')
+
+      // Validate image
+      const validation = validateImage(file)
+      if (!validation.valid) {
+        setError(validation.error || 'Invalid image')
+        return
+      }
+
+      // Optimize image before upload
+      logger.debug('Optimizing avatar image...')
+      const optimizedFile = await optimizeImage(file, {
+        maxWidth: 800,
+        maxHeight: 800,
+        maxSizeMB: 0.5, // 500KB max for avatars
+        quality: 0.85
+      })
+
+      const fileExt = optimizedFile.name.split('.').pop()
+      const fileName = `${user.id}-${Math.random()}.${fileExt}`
+      const filePath = `${fileName}`
+
+      const { error: uploadError } = await supabase.storage
+        .from('avatars')
+        .upload(filePath, optimizedFile, { upsert: true })
+
+      if (uploadError) throw uploadError
+
+      const { data: { publicUrl } } = supabase.storage
+        .from('avatars')
+        .getPublicUrl(filePath)
+
+      setAvatarUrl(publicUrl)
+      logger.info('Avatar uploaded successfully')
+    } catch (err) {
+      logger.error('Error uploading avatar:', err)
+      setError('Failed to upload avatar. You can add one later from your profile.')
+    } finally {
+      setUploadingAvatar(false)
+    }
+  }
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
@@ -172,16 +162,24 @@ export default function CompleteProfile() {
     setLoading(true)
 
     try {
-      if (!userId || !userRole) {
-        throw new Error('Session or role not found')
+      if (!user) {
+        throw new Error('Session not found')
+      }
+
+      if (!userRole) {
+        throw new Error('Profile role not found')
       }
 
       // Prepare data based on role
+      const profileNationality = userRole === 'club' ? formData.country : formData.nationality
+
       let updateData: Record<string, unknown> = {
         role: userRole, // IMPORTANT: Always include role in update
-        full_name: formData.fullName || formData.clubName,
-        base_location: formData.city,
-        nationality: formData.nationality,
+        full_name: formData.fullName || formData.clubName || '',
+        base_location: formData.city || '',
+        nationality: profileNationality || '',
+        onboarding_completed: true, // Mark onboarding as complete
+        avatar_url: avatarUrl || null, // Include avatar if uploaded
       }
 
       if (userRole === 'player') {
@@ -204,7 +202,7 @@ export default function CompleteProfile() {
           ...updateData,
           full_name: formData.clubName,
           base_location: formData.city, // City is stored in base_location
-          // Note: country field is not in profiles table, using nationality instead
+          nationality: profileNationality || '',
           year_founded: formData.yearFounded ? parseInt(formData.yearFounded) : null,
           league_division: formData.leagueDivision,
           website: formData.website,
@@ -217,45 +215,47 @@ export default function CompleteProfile() {
       logger.debug('Updating profile with data:', updateData)
 
       // Update profile
-      const { error: updateError } = await supabase
+      const { data: updatedProfile, error: updateError } = await supabase
         .from('profiles')
         .update(updateData)
-        .eq('id', userId)
+        .eq('id', user.id)
+        .select('*')
+        .single()
 
       if (updateError) {
         logger.error('Error updating profile:', updateError)
         throw new Error(`Failed to update profile: ${updateError.message}`)
       }
 
+      if (!updatedProfile) {
+        throw new Error('Profile update did not return data. Please try again.')
+      }
+
       logger.debug('Profile updated successfully')
 
-      // Fetch the updated profile to verify
-      const { data: updatedProfile, error: fetchError } = await supabase
+      // Fetch the updated profile to verify (additional safety)
+      const { data: verifiedProfile, error: fetchError } = await supabase
         .from('profiles')
         .select('*')
-        .eq('id', userId)
+        .eq('id', user.id)
         .single()
 
-      if (fetchError || !updatedProfile) {
+      if (fetchError || !verifiedProfile) {
         logger.error('Error fetching updated profile:', fetchError)
         throw new Error('Profile updated but could not verify. Please refresh the page.')
       }
 
-      logger.debug('Updated profile verified:', updatedProfile)
+      logger.debug('Updated profile verified:', verifiedProfile)
 
-      // CRITICAL: Refresh the auth store BEFORE navigating
-      // This ensures DashboardRouter sees the updated profile
-      const { fetchProfile } = useAuthStore.getState()
-      await fetchProfile(userId)
+      // CRITICAL: Refresh the auth store
+      // This ensures DashboardRouter detects the update and redirects
+  const { fetchProfile } = useAuthStore.getState()
+  // Force refresh so routing layer sees the completed profile immediately
+  await fetchProfile(user.id, { force: true })
       
       logger.debug('Auth store refreshed - profile now complete')
-
-      // Small delay to ensure state propagation
-      await new Promise(resolve => setTimeout(resolve, 100))
-
-      // Navigate to dashboard - DashboardRouter will handle role-based routing
-      logger.debug('Navigating to dashboard')
-      navigate('/dashboard/profile', { replace: true })
+      
+      // Note: Removed navigation - DashboardRouter will detect profile update and redirect
 
     } catch (err) {
       logger.error('Complete profile error:', err)
@@ -265,7 +265,8 @@ export default function CompleteProfile() {
     }
   }
 
-  if (checkingProfile) {
+  // Show loading while auth is initializing
+  if (authLoading || (profileStatus === 'fetching' && !profile)) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-gray-50">
         <div className="text-center">
@@ -276,7 +277,8 @@ export default function CompleteProfile() {
     )
   }
 
-  if (error && !userRole) {
+  // Show error if no user or profile role
+  if (!user) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-gray-50 px-4">
         <div className="max-w-md w-full bg-white rounded-xl shadow-lg p-8 text-center">
@@ -286,12 +288,38 @@ export default function CompleteProfile() {
             </svg>
           </div>
           <h2 className="text-2xl font-bold text-gray-900 mb-2">Profile Error</h2>
-          <p className="text-gray-600 mb-6">{error}</p>
+          <p className="text-gray-600 mb-6">
+            {'No session found. Please sign in again.'}
+          </p>
           <button
             onClick={() => navigate('/')}
             className="px-6 py-3 bg-gradient-to-r from-[#6366f1] to-[#8b5cf6] text-white rounded-lg hover:opacity-90 transition-opacity font-medium"
           >
             Back to Home
+          </button>
+        </div>
+      </div>
+    )
+  }
+
+  if (!userRole) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-gray-50 px-4">
+        <div className="max-w-md w-full bg-white rounded-xl shadow-lg p-8 text-center">
+          <div className="w-16 h-16 bg-yellow-100 rounded-full flex items-center justify-center mx-auto mb-4">
+            <svg className="w-8 h-8 text-yellow-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.054 0 1.62-1.14 1.054-2.054L13.054 4.946c-.527-.894-1.581-.894-2.108 0L4.928 16.946C4.362 17.86 4.928 19 5.982 19z" />
+            </svg>
+          </div>
+          <h2 className="text-2xl font-bold text-gray-900 mb-2">We Need Your Role</h2>
+          <p className="text-gray-600 mb-6">
+            We could not determine your role from signup. Please return to the signup page and choose your role again.
+          </p>
+          <button
+            onClick={() => navigate('/signup')}
+            className="px-6 py-3 bg-gradient-to-r from-[#6366f1] to-[#8b5cf6] text-white rounded-lg hover:opacity-90 transition-opacity font-medium"
+          >
+            Go to Sign Up
           </button>
         </div>
       </div>
@@ -338,6 +366,54 @@ export default function CompleteProfile() {
                 <p className="text-sm text-red-600">{error}</p>
               </div>
             )}
+
+            {/* Avatar Upload Section - Optional */}
+            <div className="mb-6 p-4 bg-gradient-to-br from-purple-50 to-indigo-50 rounded-xl border border-purple-200">
+              <label className="block text-sm font-medium text-gray-700 mb-3">
+                Profile Photo <span className="text-gray-500">(Optional)</span>
+              </label>
+              <div className="flex items-center gap-4">
+                <div 
+                  onClick={() => fileInputRef.current?.click()}
+                  className="w-20 h-20 rounded-full bg-gradient-to-br from-purple-100 to-indigo-100 flex items-center justify-center cursor-pointer hover:from-purple-200 hover:to-indigo-200 transition-all overflow-hidden border-2 border-white shadow-md"
+                >
+                  {avatarUrl ? (
+                    <img src={avatarUrl} alt="Avatar preview" className="w-full h-full object-cover" />
+                  ) : (
+                    <Camera className="w-8 h-8 text-purple-600" />
+                  )}
+                </div>
+                <div className="flex-1">
+                  <button
+                    type="button"
+                    onClick={() => fileInputRef.current?.click()}
+                    disabled={uploadingAvatar}
+                    className="px-4 py-2 bg-white hover:bg-gray-50 text-gray-700 rounded-lg transition-colors text-sm font-medium border border-gray-300 disabled:opacity-50 disabled:cursor-not-allowed"
+                  >
+                    {uploadingAvatar ? (
+                      <span className="flex items-center gap-2">
+                        <div className="w-4 h-4 border-2 border-purple-500 border-t-transparent rounded-full animate-spin" />
+                        Uploading...
+                      </span>
+                    ) : avatarUrl ? (
+                      'Change Photo'
+                    ) : (
+                      'Upload Photo'
+                    )}
+                  </button>
+                  <p className="text-xs text-gray-500 mt-1">PNG, JPG up to 5MB</p>
+                </div>
+              </div>
+              <input
+                ref={fileInputRef}
+                type="file"
+                accept="image/jpeg,image/png,image/webp"
+                onChange={handleAvatarUpload}
+                className="hidden"
+                disabled={uploadingAvatar}
+                aria-label="Upload profile photo"
+              />
+            </div>
 
             <div className="space-y-4">
               {/* Player Form */}

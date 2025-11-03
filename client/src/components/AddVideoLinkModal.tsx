@@ -4,6 +4,7 @@ import { supabase } from '../lib/supabase'
 import { useAuthStore } from '../lib/auth'
 import Button from './Button'
 import Input from './Input'
+import type { Profile } from '../lib/database.types'
 
 interface AddVideoLinkModalProps {
   isOpen: boolean
@@ -81,14 +82,18 @@ export default function AddVideoLinkModal({ isOpen, onClose, currentVideoUrl }: 
     setError('')
 
     try {
+      const updatePayload: Partial<Profile> = { highlight_video_url: normalizedUrl }
+
       const { error: updateError } = await supabase
         .from('profiles')
-        .update({ highlight_video_url: normalizedUrl } as any)
+        .update(updatePayload)
         .eq('id', user?.id || '')
 
       if (updateError) throw updateError
 
-      await fetchProfile(user?.id || '')
+      if (user?.id) {
+        await fetchProfile(user.id, { force: true })
+      }
       onClose()
     } catch (err) {
       console.error('Error saving video:', err)

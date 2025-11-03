@@ -2,6 +2,7 @@ import { useState, useRef } from 'react'
 import { X, Upload, Loader2 } from 'lucide-react'
 import { supabase } from '@/lib/supabase'
 import { useAuthStore } from '@/lib/auth'
+import type { Profile } from '@/lib/database.types'
 import { Button, Input } from '@/components'
 import { logger } from '@/lib/logger'
 import { optimizeImage, validateImage } from '@/lib/imageOptimization'
@@ -13,7 +14,7 @@ interface EditProfileModalProps {
 }
 
 export default function EditProfileModal({ isOpen, onClose, role }: EditProfileModalProps) {
-  const { profile, fetchProfile } = useAuthStore()
+  const { profile, fetchProfile, setProfile } = useAuthStore()
   const fileInputRef = useRef<HTMLInputElement>(null)
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')
@@ -125,7 +126,17 @@ export default function EditProfileModal({ isOpen, onClose, role }: EditProfileM
       optimisticUpdate.club_history = formData.club_history || null
     }
 
-    // Optimistically close modal and show updated data immediately
+  const previousProfile = profile
+  const profileId = profile.id
+    const optimisticProfile = previousProfile
+      ? ({ ...previousProfile, ...optimisticUpdate } as Profile)
+      : null
+
+    if (optimisticProfile) {
+      setProfile(optimisticProfile)
+    }
+
+    // Optimistically close modal so updated values are visible on dashboard right away
     onClose()
     
     try {
@@ -137,8 +148,9 @@ export default function EditProfileModal({ isOpen, onClose, role }: EditProfileM
       const { data, error: updateError } = await supabase
         .from('profiles')
         .update(optimisticUpdate)
-        .eq('id', profile.id)
-        .select()
+  .eq('id', profileId)
+        .select('*')
+        .single()
 
       logger.debug('Update response data:', data)
       logger.debug('Update error:', updateError)
@@ -153,12 +165,20 @@ export default function EditProfileModal({ isOpen, onClose, role }: EditProfileM
         throw updateError
       }
 
-      // Refresh profile in auth store
-      await fetchProfile(profile.id)
+      if (data) {
+        setProfile(data as Profile)
+      }
+
+      // Force refresh from server to pick up computed fields/triggers
+      await fetchProfile(profileId, { force: true })
     } catch (err) {
       logger.error('Profile update error:', err)
       logger.error('Error type:', typeof err)
       logger.error('Error object:', JSON.stringify(err, null, 2))
+      if (previousProfile) {
+        setProfile(previousProfile)
+      }
+      await fetchProfile(profileId, { force: true })
       // Show error but don't reopen modal - user already sees their changes
       alert('Some profile changes may not have saved. Please refresh the page.')
     } finally {

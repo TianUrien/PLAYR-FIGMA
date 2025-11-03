@@ -1,6 +1,6 @@
-import { useEffect, useState } from 'react'
+import { useEffect } from 'react'
 import { Navigate, useLocation } from 'react-router-dom'
-import { supabase } from '@/lib/supabase'
+import { useAuthStore } from '@/lib/auth'
 
 interface ProtectedRouteProps {
   children: React.ReactNode
@@ -11,43 +11,33 @@ const PUBLIC_ROUTES = ['/', '/signup', '/verify-email', '/auth/callback', '/priv
 /**
  * ProtectedRoute - Centralized auth guard
  * 
+ * Uses global auth store (useAuthStore) instead of local state
+ * to prevent duplicate auth listeners and state management conflicts.
+ * 
  * Public routes (allowlist): /, /signup, /verify-email, /auth/callback
  * Protected routes: Everything else requires authentication
  * 
  * IMPORTANT: Never redirect from /auth/callback or /verify-email
  * before auth processing completes
+ * 
+ * Uses shallow selectors to minimize re-renders
  */
 export default function ProtectedRoute({ children }: ProtectedRouteProps) {
   const location = useLocation()
-  const [isAuthenticated, setIsAuthenticated] = useState<boolean | null>(null)
-  const [isLoading, setIsLoading] = useState(true)
+  const user = useAuthStore(state => state.user)
+  const loading = useAuthStore(state => state.loading)
 
   useEffect(() => {
-    // Check initial session
-    const checkAuth = async () => {
-      try {
-        const { data: { session } } = await supabase.auth.getSession()
-        setIsAuthenticated(!!session)
-      } catch (error) {
-        console.error('Auth check error:', error)
-        setIsAuthenticated(false)
-      } finally {
-        setIsLoading(false)
-      }
-    }
-
-    checkAuth()
-
-    // Listen for auth changes
-    const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
-      setIsAuthenticated(!!session)
+    console.log('[PROTECTED_ROUTE]', {
+      path: location.pathname,
+      loading,
+      hasUser: !!user,
+      isPublic: PUBLIC_ROUTES.some(route => location.pathname.startsWith(route))
     })
-
-    return () => subscription.unsubscribe()
-  }, [])
+  }, [location.pathname, loading, user])
 
   // Show loading while checking auth
-  if (isLoading) {
+  if (loading) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-gray-50">
         <div className="text-center">
@@ -67,7 +57,7 @@ export default function ProtectedRoute({ children }: ProtectedRouteProps) {
   }
 
   // Protected routes - require authentication
-  if (!isAuthenticated) {
+  if (!user) {
     // Store intended destination for redirect after login
     return <Navigate to="/" state={{ from: location.pathname }} replace />
   }

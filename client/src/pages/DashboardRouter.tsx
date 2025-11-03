@@ -5,23 +5,76 @@ import PlayerDashboard from './PlayerDashboard'
 import CoachDashboard from './CoachDashboard'
 import ClubDashboard from './ClubDashboard'
 
+/**
+ * DashboardRouter - Single source of truth for profile-based routing
+ * 
+ * This component is the ONLY place that makes routing decisions based on profile state.
+ * 
+ * Routing logic:
+ * 1. No user → redirect to landing page
+ * 2. User but no profile → wait (profile is being fetched)
+ * 3. User with incomplete profile → redirect to /complete-profile (once only)
+ * 4. User with complete profile → render role-based dashboard
+ * 
+ * Uses persistent state (hasCompletedOnboardingRedirect) to prevent redirect loops
+ */
 export default function DashboardRouter() {
   const navigate = useNavigate()
-  const { user, profile, loading } = useAuthStore()
+  const { user, profile, loading, hasCompletedOnboardingRedirect, setHasCompletedOnboardingRedirect, profileStatus } = useAuthStore()
 
   useEffect(() => {
-    if (!loading && !user) {
-      navigate('/')
+    console.log('[DASHBOARD_ROUTER]', {
+      loading,
+      hasUser: !!user,
+      hasProfile: !!profile,
+      fullName: profile?.full_name,
+      // onboarding_completed field exists in DB but not in types yet
+      hasCompletedOnboardingRedirect,
+      profileStatus
+    })
+
+    // Wait for auth to finish loading
+    if (loading) return
+
+    // No user → redirect to landing
+    if (!user) {
+      console.log('[DASHBOARD_ROUTER] No user, redirecting to landing')
+      navigate('/', { replace: true })
       return
     }
 
-    // Check if profile is incomplete (verified but no full_name)
-    if (!loading && profile && !profile.full_name) {
-      console.warn('[ROUTER] Profile incomplete (no full_name), redirecting to /complete-profile')
+    // No profile yet
+    if (!profile) {
+      if (profileStatus === 'missing') {
+        console.log('[DASHBOARD_ROUTER] Profile missing, routing to /complete-profile')
+        if (!hasCompletedOnboardingRedirect) {
+          setHasCompletedOnboardingRedirect(true)
+        }
+        navigate('/complete-profile', { replace: true })
+      } else {
+        console.log('[DASHBOARD_ROUTER] No profile yet, waiting...')
+      }
+      return
+    }
+
+    // Profile exists but incomplete (no full_name) → route to complete-profile
+    // Only attempt redirect once to prevent loops
+    if (!profile.full_name && !hasCompletedOnboardingRedirect) {
+      setHasCompletedOnboardingRedirect(true)
+      console.log('[DASHBOARD_ROUTER] Profile incomplete (no full_name), routing to /complete-profile')
       navigate('/complete-profile', { replace: true })
       return
     }
-  }, [user, profile, loading, navigate])
+
+    // Profile complete → continue to render dashboard below
+    if (profile.full_name) {
+      console.log('[DASHBOARD_ROUTER] Profile complete, rendering dashboard')
+      if (hasCompletedOnboardingRedirect) {
+        setHasCompletedOnboardingRedirect(false)
+      }
+    }
+
+  }, [user, profile, loading, navigate, hasCompletedOnboardingRedirect, setHasCompletedOnboardingRedirect, profileStatus])
 
   if (loading) {
     return (

@@ -1,4 +1,4 @@
-import { useEffect, lazy, Suspense } from 'react'
+import { useEffect, useRef, lazy, Suspense } from 'react'
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom'
 import { initializeAuth } from '@/lib/auth'
 import { ProtectedRoute, ErrorBoundary, Layout } from '@/components'
@@ -32,10 +32,27 @@ const PageLoader = () => (
 )
 
 function App() {
+  const initRef = useRef(false)
+
   useEffect(() => {
+    // Guard against React 18 Strict Mode double initialization
+    if (initRef.current) {
+      console.log('[APP] Already initialized, skipping')
+      return
+    }
+    
+    initRef.current = true
+    console.log('[APP] Initializing auth')
+    
     // Initialize auth listener
     const subscription = initializeAuth()
-    return () => subscription.unsubscribe()
+    
+    return () => {
+      console.log('[APP] Cleaning up auth')
+      subscription.unsubscribe()
+      // Reset on actual unmount (not Strict Mode)
+      initRef.current = false
+    }
   }, [])
 
   return (
