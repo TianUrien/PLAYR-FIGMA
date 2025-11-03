@@ -111,9 +111,9 @@ export default function SignUp() {
         <div className="bg-white rounded-2xl shadow-2xl animate-scale-in overflow-hidden">
           <div className="p-6 border-b border-gray-200 bg-gradient-to-r from-[#6366f1] to-[#8b5cf6]">
             <div className="flex items-center gap-3 mb-2">
-              <img 
-                src="/PLAYR logo White.png" 
-                alt="PLAYR" 
+              <img
+                src="/WhiteLogo.svg"
+                alt="PLAYR"
                 className="h-8"
               />
             </div>
