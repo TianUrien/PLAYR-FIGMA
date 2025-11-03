@@ -22,7 +22,7 @@ export default function VerifyEmail() {
 
   useEffect(() => {
     // Get email from URL param or localStorage (from signup)
-    const storedEmail = emailParam || localStorage.getItem('pendingVerificationEmail')
+    const storedEmail = emailParam || localStorage.getItem('pending_email')
     if (storedEmail) {
       setEmail(storedEmail)
     }

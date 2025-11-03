@@ -66,37 +66,68 @@ export default function CompleteProfile() {
           .eq('id', session.user.id)
           .single()
 
-        // If profile doesn't exist, create it now
+                // If profile doesn't exist (PGRST116), create it with retry logic
         if (profileError && profileError.code === 'PGRST116') {
-          logger.debug('Profile not found, creating basic profile')
+          logger.debug('Profile not found, creating basic profile with retry')
           
           // Get role from user metadata or localStorage
           const role = session.user.user_metadata?.role || localStorage.getItem('pending_role') || 'player'
           
-          // Create basic profile (type assertion needed until DB types are regenerated after migration)
-          const { error: insertError } = await supabase
-            .from('profiles')
-            .insert({
-              id: session.user.id,
-              email: session.user.email!,
-              role: role,
-              full_name: null,
-              base_location: null,
-              nationality: null
-            } as unknown as never)
+          // Retry logic: try up to 3 times with exponential backoff
+          let insertError = null
+          for (let attempt = 1; attempt <= 3; attempt++) {
+            logger.debug(`Profile creation attempt ${attempt}/3`)
+            
+            // Create basic profile (type assertion needed until DB types are regenerated after migration)
+            const { error } = await supabase
+              .from('profiles')
+              .insert({
+                id: session.user.id,
+                email: session.user.email!,
+                role: role,
+                full_name: null,
+                base_location: null,
+                nationality: null
+              } as unknown as never)
 
-          if (insertError) {
-            logger.error('Error creating profile:', insertError)
-            setError('Could not create your profile. Please try again or contact support.')
-            setCheckingProfile(false)
-            return
+            if (!error) {
+              logger.debug(`Basic profile created successfully on attempt ${attempt}`)
+              setUserRole(role as UserRole)
+              setFormData(prev => ({ ...prev, contactEmail: session.user.email || '' }))
+              setCheckingProfile(false)
+              return
+            }
+            
+            // If conflict error (23505), profile already exists - fetch it
+            if (error.code === '23505') {
+              logger.debug('Profile already exists (conflict), fetching it')
+              const { data: existingProfile } = await supabase
+                .from('profiles')
+                .select('role, full_name, email')
+                .eq('id', session.user.id)
+                .single()
+              
+              if (existingProfile) {
+                setUserRole(existingProfile.role as UserRole)
+                setFormData(prev => ({ ...prev, contactEmail: existingProfile.email || '' }))
+                setCheckingProfile(false)
+                return
+              }
+            }
+            
+            insertError = error
+            
+            // Exponential backoff: wait 1s, 2s, 4s before retry
+            if (attempt < 3) {
+              const delay = Math.pow(2, attempt - 1) * 1000
+              logger.debug(`Waiting ${delay}ms before retry...`)
+              await new Promise(resolve => setTimeout(resolve, delay))
+            }
           }
 
-          logger.debug('Basic profile created successfully')
-
-          // Use the newly created profile
-          setUserRole(role as UserRole)
-          setFormData(prev => ({ ...prev, contactEmail: session.user.email || '' }))
+          // All retries failed
+          logger.error('Error creating profile after 3 attempts:', insertError)
+          setError('Could not create your profile. Please refresh the page and try again, or contact support if this persists.')
           setCheckingProfile(false)
           return
         }
@@ -115,14 +146,8 @@ export default function CompleteProfile() {
           return
         }
 
-        // If profile already complete, go to dashboard
-        if (profile.full_name) {
-          logger.debug('Profile already complete, redirecting to dashboard')
-          navigate('/dashboard/profile')
-          return
-        }
-
-        // Set role from profile
+        // Set role from profile (removed auto-redirect to prevent loop)
+        // DashboardRouter will handle routing for complete profiles
         setUserRole(profile.role as UserRole)
         
         // Pre-fill email if available
@@ -218,16 +243,19 @@ export default function CompleteProfile() {
 
       logger.debug('Updated profile verified:', updatedProfile)
 
-      // Refresh the auth store with the updated profile
+      // CRITICAL: Refresh the auth store BEFORE navigating
+      // This ensures DashboardRouter sees the updated profile
       const { fetchProfile } = useAuthStore.getState()
       await fetchProfile(userId)
       
-      logger.debug('Auth store refreshed with updated profile')
+      logger.debug('Auth store refreshed - profile now complete')
 
-      // Redirect to dashboard with role-specific route
-      const dashboardRoute = updatedProfile.role === 'club' ? '/dashboard/profile' : '/dashboard/profile'
-      logger.debug('Redirecting to:', dashboardRoute)
-      navigate(dashboardRoute)
+      // Small delay to ensure state propagation
+      await new Promise(resolve => setTimeout(resolve, 100))
+
+      // Navigate to dashboard - DashboardRouter will handle role-based routing
+      logger.debug('Navigating to dashboard')
+      navigate('/dashboard/profile', { replace: true })
 
     } catch (err) {
       logger.error('Complete profile error:', err)

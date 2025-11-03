@@ -68,12 +68,17 @@ export default function CoachDashboard({ profileData, readOnly = false }: CoachD
     { id: 'experience', label: 'Experience' },
   ]
 
-  const getInitials = (name: string) => {
+  const getInitials = (name: string | null) => {
+    if (!name) return '?'  // Return placeholder for null/undefined
+    
     return name
+      .trim()
       .split(' ')
+      .filter(n => n.length > 0)  // Handle multiple spaces
       .map(n => n[0])
       .join('')
       .toUpperCase()
+      .slice(0, 2)  // Limit to 2 characters
   }
 
   const calculateAge = (dateOfBirth: string | null): number | null => {

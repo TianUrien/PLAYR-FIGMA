@@ -36,33 +36,61 @@ export default function Landing() {
         // Check if error is due to unverified email
         if (signInError.message.includes('Email not confirmed')) {
           // Redirect to verification page
+          console.log('[SIGN IN] Email not verified, redirecting to verification page')
           navigate(`/verify-email?email=${encodeURIComponent(email)}&reason=unverified_signin`)
           return
         }
         throw signInError
       }
 
-      if (data.user) {
-        // Check if profile exists
-        const { data: profileData, error: profileError } = await supabase
-          .from('profiles')
-          .select('*')
-          .eq('id', data.user.id)
-          .single()
-
-        if (profileError) {
-          setError('Could not load your profile. Please try again.')
-          await supabase.auth.signOut()
-          return
-        }
-
-        if (profileData) {
-          navigate('/dashboard/profile')
-        } else {
-          setError('Profile not found. Please contact support.')
-        }
+      if (!data.user) {
+        throw new Error('No user data returned')
       }
+
+      console.log('[SIGN IN] Sign in successful, checking profile...')
+
+      // Check if profile exists and is complete
+      const { data: profileData, error: profileError } = await supabase
+        .from('profiles')
+        .select('id, role, full_name, email')
+        .eq('id', data.user.id)
+        .single()
+
+      // Handle profile not found - redirect to complete profile
+      if (profileError && profileError.code === 'PGRST116') {
+        console.log('[SIGN IN] Profile not found, redirecting to complete profile')
+        navigate('/complete-profile')
+        return
+      }
+
+      // Other profile errors - don't sign out, let user retry
+      if (profileError) {
+        console.error('[SIGN IN] Error fetching profile:', profileError)
+        setError('Could not load your profile. Please try again or contact support if this persists.')
+        setLoading(false)
+        return
+      }
+
+      if (!profileData) {
+        console.error('[SIGN IN] Profile is null (unexpected)')
+        setError('Profile not found. Please contact support.')
+        setLoading(false)
+        return
+      }
+
+      // Check if profile is incomplete (zombie account recovery!)
+      if (!profileData.full_name) {
+        console.log('[SIGN IN] Profile incomplete (no full_name), redirecting to complete profile')
+        navigate('/complete-profile')
+        return
+      }
+
+      // Profile is complete - go to dashboard
+      console.log('[SIGN IN] Profile complete, redirecting to dashboard')
+      navigate('/dashboard/profile')
+
     } catch (err) {
+      console.error('[SIGN IN] Sign in error:', err)
       setError(err instanceof Error ? err.message : 'Sign in failed')
     } finally {
       setLoading(false)

@@ -22,12 +22,15 @@ export default function AuthCallback() {
 
   useEffect(() => {
     let sessionEstablished = false
+    const startTime = Date.now()
 
     const handleSession = async (userId: string) => {
       if (sessionEstablished) return
       sessionEstablished = true
 
-      logger.debug('Session established for user:', userId)
+      // Log session establishment with timing (always visible in production)
+      const duration = Date.now() - startTime
+      console.log('[AUTH]', 'Session established for user:', userId, 'Duration:', duration + 'ms', 'Timestamp:', new Date().toISOString())
       setStatus('Loading your profile...')
 
       try {
@@ -102,7 +105,8 @@ export default function AuthCallback() {
 
     // Listen for auth state changes (SDK will trigger this after processing URL)
     const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, session) => {
-      logger.debug('Auth state change:', event, session?.user?.id)
+      // Use console.log directly for critical auth events (always visible in production)
+      console.log('[AUTH]', 'State change:', event, 'User ID:', session?.user?.id, 'Timestamp:', new Date().toISOString())
 
       if (event === 'SIGNED_IN' && session) {
         await handleSession(session.user.id)
@@ -166,7 +170,7 @@ export default function AuthCallback() {
       const storedEmail = localStorage.getItem('pending_email')
       const emailParam = storedEmail ? `&email=${encodeURIComponent(storedEmail)}` : ''
       navigate(`/verify-email?error=expired&reason=no_tokens${emailParam}`)
-    }, 5000) // Wait 5 seconds for SDK to process (increased from 3s)
+    }, 15000) // Wait 15 seconds for SDK to process (increased from 5s to handle slow networks)
 
     // Cleanup
     return () => {

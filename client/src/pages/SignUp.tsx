@@ -59,7 +59,21 @@ export default function SignUp() {
         }
       })
 
-      if (signUpError) throw signUpError
+      if (signUpError) {
+        // Handle "user already exists" error with helpful message
+        if (signUpError.message.includes('already registered') || 
+            signUpError.message.includes('already exists') ||
+            signUpError.message.includes('User already registered')) {
+          logger.debug('User already registered, showing helpful error')
+          setError('This email is already registered. Please sign in instead.')
+          setTimeout(() => {
+            navigate(`/?email=${encodeURIComponent(formData.email)}`)
+          }, 3000)
+          return
+        }
+        throw signUpError
+      }
+
       if (!authData.user) throw new Error('No user data returned from signup')
 
       logger.debug('Auth account created successfully:', authData.user.id)
