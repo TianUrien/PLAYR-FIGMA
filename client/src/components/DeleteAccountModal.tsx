@@ -1,7 +1,8 @@
-import { useState } from 'react'
+import { useCallback, useEffect, useId, useRef, useState } from 'react'
 import { X, AlertTriangle, Loader2 } from 'lucide-react'
 import { supabase } from '../lib/supabase'
 import { useAuthStore } from '../lib/auth'
+import { useFocusTrap } from '@/hooks/useFocusTrap'
 
 interface DeleteAccountModalProps {
   isOpen: boolean
@@ -14,6 +15,38 @@ export default function DeleteAccountModal({ isOpen, onClose, userEmail }: Delet
   const [confirmText, setConfirmText] = useState('')
   const [isDeleting, setIsDeleting] = useState(false)
   const [error, setError] = useState<string | null>(null)
+  const dialogRef = useRef<HTMLDivElement>(null)
+  const inputRef = useRef<HTMLInputElement | null>(null)
+  const titleId = useId()
+  const descriptionId = useId()
+  const confirmationFieldId = useId()
+
+  const handleClose = useCallback(() => {
+    if (isDeleting) {
+      return
+    }
+    setConfirmText('')
+    setError(null)
+    onClose()
+  }, [isDeleting, onClose])
+
+  useFocusTrap({ containerRef: dialogRef, isActive: isOpen, initialFocusRef: inputRef })
+
+  useEffect(() => {
+    if (!isOpen) {
+      return
+    }
+
+    const handleKeyDown = (event: KeyboardEvent) => {
+      if (event.key === 'Escape') {
+        event.preventDefault()
+        handleClose()
+      }
+    }
+
+    document.addEventListener('keydown', handleKeyDown)
+    return () => document.removeEventListener('keydown', handleKeyDown)
+  }, [handleClose, isOpen])
 
   if (!isOpen) return null
 
@@ -74,17 +107,17 @@ export default function DeleteAccountModal({ isOpen, onClose, userEmail }: Delet
     }
   }
 
-  const handleClose = () => {
-    if (!isDeleting) {
-      setConfirmText('')
-      setError(null)
-      onClose()
-    }
-  }
-
   return (
-    <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
-      <div className="bg-white rounded-xl max-w-md w-full p-6 relative">
+    <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-50 p-4" role="presentation">
+      <div
+        ref={dialogRef}
+        className="bg-white rounded-xl max-w-md w-full p-6 relative focus:outline-none"
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby={titleId}
+        aria-describedby={descriptionId}
+        tabIndex={-1}
+      >
         {/* Close button */}
         {!isDeleting && (
           <button
@@ -102,12 +135,12 @@ export default function DeleteAccountModal({ isOpen, onClose, userEmail }: Delet
         </div>
 
         {/* Title */}
-        <h2 className="text-2xl font-bold text-gray-900 text-center mb-2">
+        <h2 id={titleId} className="text-2xl font-bold text-gray-900 text-center mb-2">
           Delete your account?
         </h2>
 
         {/* Description */}
-        <p className="text-gray-600 text-center mb-6">
+        <p id={descriptionId} className="text-gray-600 text-center mb-6">
           This action is <strong>irreversible</strong>. All your profile data, messages, and uploaded media will be permanently deleted.
         </p>
 
@@ -127,10 +160,11 @@ export default function DeleteAccountModal({ isOpen, onClose, userEmail }: Delet
 
         {/* Confirmation input */}
         <div className="mb-6">
-          <label className="block text-sm font-medium text-gray-700 mb-2">
+          <label htmlFor={confirmationFieldId} className="block text-sm font-medium text-gray-700 mb-2">
             Type <span className="font-bold text-red-600">DELETE</span> to confirm:
           </label>
           <input
+            ref={inputRef}
             type="text"
             value={confirmText}
             onChange={(e) => setConfirmText(e.target.value)}
@@ -138,6 +172,7 @@ export default function DeleteAccountModal({ isOpen, onClose, userEmail }: Delet
             disabled={isDeleting}
             className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-red-500 focus:border-transparent disabled:bg-gray-100 disabled:cursor-not-allowed"
             autoComplete="off"
+            id={confirmationFieldId}
           />
         </div>
 

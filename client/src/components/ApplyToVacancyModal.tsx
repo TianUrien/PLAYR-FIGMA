@@ -1,9 +1,10 @@
-import { useState } from 'react'
+import { useCallback, useEffect, useId, useRef, useState } from 'react'
 import { X } from 'lucide-react'
 import { supabase } from '../lib/supabase'
 import { useAuthStore } from '../lib/auth'
 import type { Vacancy } from '../lib/database.types'
 import Button from './Button'
+import { useFocusTrap } from '@/hooks/useFocusTrap'
 
 interface ApplyToVacancyModalProps {
   isOpen: boolean
@@ -22,6 +23,37 @@ export default function ApplyToVacancyModal({
   const [coverLetter, setCoverLetter] = useState('')
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [error, setError] = useState<string | null>(null)
+  const dialogRef = useRef<HTMLDivElement>(null)
+  const textareaRef = useRef<HTMLTextAreaElement | null>(null)
+  const titleId = useId()
+  const descriptionId = useId()
+
+  const handleClose = useCallback(() => {
+    if (isSubmitting) {
+      return
+    }
+    onClose()
+    setCoverLetter('')
+    setError(null)
+  }, [isSubmitting, onClose])
+
+  useFocusTrap({ containerRef: dialogRef, isActive: isOpen, initialFocusRef: textareaRef })
+
+  useEffect(() => {
+    if (!isOpen) {
+      return
+    }
+
+    const handleKeyDown = (event: KeyboardEvent) => {
+      if (event.key === 'Escape') {
+        event.preventDefault()
+        handleClose()
+      }
+    }
+
+    document.addEventListener('keydown', handleKeyDown)
+    return () => document.removeEventListener('keydown', handleKeyDown)
+  }, [handleClose, isOpen])
 
   if (!isOpen) return null
 
@@ -73,22 +105,22 @@ export default function ApplyToVacancyModal({
     }
   }
 
-  const handleClose = () => {
-    if (!isSubmitting) {
-      onClose()
-      setCoverLetter('')
-      setError(null)
-    }
-  }
-
   return (
-    <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
-      <div className="bg-white rounded-2xl max-w-2xl w-full max-h-[90vh] overflow-y-auto">
+    <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-50 p-4" role="presentation">
+      <div
+        ref={dialogRef}
+        className="bg-white rounded-2xl max-w-2xl w-full max-h-[90vh] overflow-y-auto focus:outline-none"
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby={titleId}
+        aria-describedby={descriptionId}
+        tabIndex={-1}
+      >
         {/* Header */}
         <div className="sticky top-0 bg-white border-b border-gray-200 px-6 py-4 flex items-center justify-between">
           <div>
-            <h2 className="text-2xl font-bold text-gray-900">Apply to Position</h2>
-            <p className="text-sm text-gray-600 mt-1">{vacancy.title}</p>
+            <h2 id={titleId} className="text-2xl font-bold text-gray-900">Apply to Position</h2>
+            <p id={descriptionId} className="text-sm text-gray-600 mt-1">{vacancy.title}</p>
           </div>
           <button
             onClick={handleClose}
@@ -126,6 +158,7 @@ export default function ApplyToVacancyModal({
               Cover Letter <span className="text-gray-400">(Optional)</span>
             </label>
             <textarea
+              ref={textareaRef}
               id="coverLetter"
               value={coverLetter}
               onChange={(e) => setCoverLetter(e.target.value)}

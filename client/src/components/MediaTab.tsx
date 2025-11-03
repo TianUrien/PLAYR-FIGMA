@@ -7,6 +7,7 @@ import Button from './Button'
 import AddVideoLinkModal from './AddVideoLinkModal'
 import { optimizeImage, validateImage } from '@/lib/imageOptimization'
 import { logger } from '@/lib/logger'
+import { invalidateProfile } from '@/lib/profile'
 
 interface MediaTabProps {
   profileId?: string
@@ -14,7 +15,7 @@ interface MediaTabProps {
 }
 
 export default function MediaTab({ profileId, readOnly = false }: MediaTabProps) {
-  const { user, profile: authProfile, fetchProfile } = useAuthStore()
+  const { user, profile: authProfile } = useAuthStore()
   const targetUserId = profileId || user?.id
   const [targetProfile, setTargetProfile] = useState<Profile | null>(null)
   const [showAddVideoModal, setShowAddVideoModal] = useState(false)
@@ -193,7 +194,7 @@ export default function MediaTab({ profileId, readOnly = false }: MediaTabProps)
 
       if (error) throw error
 
-  await fetchProfile(user.id, { force: true })
+      await invalidateProfile({ userId: user.id, reason: 'highlight-video-removed' })
     } catch (error) {
       console.error('Error deleting video:', error)
       alert('Failed to remove video. Please try again.')

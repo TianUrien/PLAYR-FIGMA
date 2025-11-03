@@ -1,18 +1,25 @@
-import { forwardRef, type InputHTMLAttributes } from 'react'
+import { forwardRef, type InputHTMLAttributes, type ReactNode, useId } from 'react'
 import { cn } from '@/lib/utils'
 
 interface InputProps extends InputHTMLAttributes<HTMLInputElement> {
   label?: string
   error?: string
-  icon?: React.ReactNode
+  icon?: ReactNode
 }
 
 const Input = forwardRef<HTMLInputElement, InputProps>(
   ({ label, error, icon, className, ...props }, ref) => {
+    const generatedId = useId()
+    const inputId = props.id ?? generatedId
+    const errorMessageId = error ? `${inputId}-error` : undefined
+    const accessibilityProps = {
+      ...(errorMessageId && { 'aria-describedby': errorMessageId }),
+      ...(error && { 'aria-invalid': 'true' as const })
+    }
     return (
       <div className="space-y-2">
         {label && (
-          <label className="block text-sm font-medium text-gray-700">
+          <label className="block text-sm font-medium text-gray-700" htmlFor={inputId}>
             {label}
             {props.required && <span className="text-red-500 ml-1">*</span>}
           </label>
@@ -25,6 +32,7 @@ const Input = forwardRef<HTMLInputElement, InputProps>(
           )}
           <input
             ref={ref}
+            id={inputId}
             className={cn(
               "w-full px-4 py-3 bg-gray-50 border border-gray-200 rounded-lg",
               "focus:outline-none focus:ring-2 focus:ring-[#6366f1] focus:border-transparent",
@@ -35,10 +43,11 @@ const Input = forwardRef<HTMLInputElement, InputProps>(
               className
             )}
             {...props}
+            {...accessibilityProps}
           />
         </div>
         {error && (
-          <p className="text-sm text-red-500">{error}</p>
+          <p className="text-sm text-red-500" id={errorMessageId}>{error}</p>
         )}
       </div>
     )

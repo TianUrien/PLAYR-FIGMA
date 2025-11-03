@@ -1,5 +1,5 @@
 import { create } from 'zustand'
-import type { User, PostgrestError } from '@supabase/supabase-js'
+import type { User, PostgrestError, Session } from '@supabase/supabase-js'
 import type { Profile, ProfileInsert } from './supabase'
 import { supabase } from './supabase'
 import { requestCache, generateCacheKey } from './requestCache'
@@ -135,32 +135,97 @@ export const useAuthStore = create<AuthState>((set, get) => ({
   }
 }))
 
+const localStorageAvailable = () => typeof window !== 'undefined' && typeof window.localStorage !== 'undefined'
+
+const clearPendingRole = () => {
+  if (!localStorageAvailable()) return
+  window.localStorage.removeItem('pending_role')
+  window.localStorage.removeItem('pending_email')
+}
+
+const resolvePendingRole = (user: User | null): string | null => {
+  if (!localStorageAvailable() || !user?.email) return null
+  const pendingRole = window.localStorage.getItem('pending_role')
+  const pendingEmail = window.localStorage.getItem('pending_email')
+  if (pendingRole && pendingEmail && pendingEmail === user.email) {
+    return pendingRole
+  }
+  return null
+}
+
+const ensureUserRoleMetadata = async (user: User | null): Promise<string | null> => {
+  if (!user) return null
+
+  const currentRole = typeof user.user_metadata?.role === 'string' && user.user_metadata.role
+    ? (user.user_metadata.role as string)
+    : null
+
+  if (currentRole) {
+    clearPendingRole()
+    return currentRole
+  }
+
+  const pendingRole = resolvePendingRole(user)
+  if (pendingRole) {
+    logger.warn('[AUTH_STORE] Hydrating missing role metadata from localStorage fallback', { userId: user.id, pendingRole })
+    const { data, error } = await supabase.auth.updateUser({ data: { role: pendingRole } })
+    if (error) {
+      logger.error('[AUTH_STORE] Failed to backfill role metadata from localStorage', { userId: user.id, error })
+    } else if (data.user) {
+      useAuthStore.getState().setUser(data.user)
+      clearPendingRole()
+      return pendingRole
+    }
+  }
+
+  const profileRole = useAuthStore.getState().profile?.role
+  if (profileRole) {
+    logger.warn('[AUTH_STORE] Backfilling missing role metadata from profile record', { userId: user.id, profileRole })
+    const { data, error } = await supabase.auth.updateUser({ data: { role: profileRole } })
+    if (error) {
+      logger.error('[AUTH_STORE] Failed to sync role metadata from profile', { userId: user.id, error })
+    } else if (data.user) {
+      useAuthStore.getState().setUser(data.user)
+      clearPendingRole()
+      return profileRole
+    }
+  }
+
+  logger.error('[AUTH_STORE] Unable to determine role metadata for user', { userId: user.id })
+  return null
+}
+
+const runSessionEffects = async (session: Session | null) => {
+  const { setUser, fetchProfile } = useAuthStore.getState()
+  const user = session?.user ?? null
+  setUser(user)
+
+  if (user) {
+    await ensureUserRoleMetadata(user)
+    await fetchProfile(user.id)
+  } else {
+    useAuthStore.setState({ profile: null, profileStatus: 'idle', profileFetchedAt: null })
+  }
+}
+
 // Initialize auth listener
 export const initializeAuth = () => {
-  const { setUser, setLoading, fetchProfile } = useAuthStore.getState()
-  
+  const { setLoading } = useAuthStore.getState()
+
   // Check current session
-  supabase.auth.getSession().then(({ data: { session } }) => {
-    setUser(session?.user ?? null)
-    if (session?.user) {
-      fetchProfile(session.user.id)
-    } else {
-      useAuthStore.setState({ profile: null, profileStatus: 'idle', profileFetchedAt: null })
-    }
+  supabase.auth.getSession().then(async ({ data: { session } }) => {
+    await runSessionEffects(session)
     setLoading(false)
   })
-  
+
   // Listen for auth changes
   const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
-    setUser(session?.user ?? null)
-    if (session?.user) {
-      fetchProfile(session.user.id)
-    } else {
-      useAuthStore.setState({ profile: null, profileStatus: 'idle', profileFetchedAt: null })
-    }
-    setLoading(false)
+    setLoading(true)
+    runSessionEffects(session)
+      .catch((error) => logger.error('[AUTH_STORE] Error handling auth state change', { error }))
+      .finally(() => setLoading(false))
   })
-  
+
   return subscription
 }
 

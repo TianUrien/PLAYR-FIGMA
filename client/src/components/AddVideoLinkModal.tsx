@@ -1,10 +1,12 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef, useId } from 'react'
 import { X, Link as LinkIcon, Loader2 } from 'lucide-react'
 import { supabase } from '../lib/supabase'
 import { useAuthStore } from '../lib/auth'
 import Button from './Button'
 import Input from './Input'
 import type { Profile } from '../lib/database.types'
+import { useFocusTrap } from '@/hooks/useFocusTrap'
+import { invalidateProfile } from '@/lib/profile'
 
 interface AddVideoLinkModalProps {
   isOpen: boolean
@@ -13,10 +15,30 @@ interface AddVideoLinkModalProps {
 }
 
 export default function AddVideoLinkModal({ isOpen, onClose, currentVideoUrl }: AddVideoLinkModalProps) {
-  const { user, fetchProfile } = useAuthStore()
+  const { user } = useAuthStore()
   const [videoUrl, setVideoUrl] = useState('')
   const [isLoading, setIsLoading] = useState(false)
   const [error, setError] = useState('')
+  const dialogRef = useRef<HTMLDivElement>(null)
+  const inputRef = useRef<HTMLInputElement | null>(null)
+  const titleId = useId()
+  const videoUrlInputId = useId()
+
+  useFocusTrap({ containerRef: dialogRef, isActive: isOpen, initialFocusRef: inputRef })
+
+  useEffect(() => {
+    if (!isOpen) return
+
+    const handleKeyDown = (event: KeyboardEvent) => {
+      if (event.key === 'Escape' && !isLoading) {
+        event.preventDefault()
+        onClose()
+      }
+    }
+
+    document.addEventListener('keydown', handleKeyDown)
+    return () => document.removeEventListener('keydown', handleKeyDown)
+  }, [isLoading, isOpen, onClose])
 
   useEffect(() => {
     if (isOpen) {
@@ -92,7 +114,7 @@ export default function AddVideoLinkModal({ isOpen, onClose, currentVideoUrl }: 
       if (updateError) throw updateError
 
       if (user?.id) {
-        await fetchProfile(user.id, { force: true })
+        await invalidateProfile({ userId: user.id, reason: 'highlight-video-updated' })
       }
       onClose()
     } catch (err) {
@@ -106,17 +128,25 @@ export default function AddVideoLinkModal({ isOpen, onClose, currentVideoUrl }: 
   if (!isOpen) return null
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black bg-opacity-50">
-      <div className="bg-white rounded-2xl shadow-2xl w-full max-w-2xl max-h-[90vh] overflow-y-auto">
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm" role="presentation">
+      <div
+        ref={dialogRef}
+        className="bg-white rounded-2xl shadow-2xl w-full max-w-2xl max-h-[90vh] overflow-y-auto focus:outline-none"
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby={titleId}
+        tabIndex={-1}
+      >
         <div className="p-6 border-b border-gray-200">
           <div className="flex items-center justify-between">
-            <h2 className="text-2xl font-bold text-gray-900">
+            <h2 id={titleId} className="text-2xl font-bold text-gray-900">
               {currentVideoUrl ? 'Manage Highlight Video' : 'Add Video Link'}
             </h2>
             <button
-              onClick={onClose}
-              className="text-gray-400 hover:text-gray-600 transition-colors"
+              onClick={() => !isLoading && onClose()}
+              className="text-gray-400 hover:text-gray-600 transition-colors disabled:cursor-not-allowed"
               aria-label="Close modal"
+              disabled={isLoading}
             >
               <X className="w-6 h-6" />
             </button>
@@ -125,10 +155,12 @@ export default function AddVideoLinkModal({ isOpen, onClose, currentVideoUrl }: 
 
         <div className="p-6 space-y-6">
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-2">
+            <label className="block text-sm font-medium text-gray-700 mb-2" htmlFor={videoUrlInputId}>
               Video URL
             </label>
             <Input
+              id={videoUrlInputId}
+              ref={inputRef}
               type="text"
               value={videoUrl}
               onChange={(e) => setVideoUrl(e.target.value)}
@@ -163,7 +195,7 @@ export default function AddVideoLinkModal({ isOpen, onClose, currentVideoUrl }: 
         <div className="p-6 border-t border-gray-200 flex justify-end gap-3">
           <Button
             variant="outline"
-            onClick={onClose}
+            onClick={() => !isLoading && onClose()}
             disabled={isLoading}
           >
             Cancel

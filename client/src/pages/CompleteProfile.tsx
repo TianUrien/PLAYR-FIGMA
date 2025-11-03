@@ -6,6 +6,7 @@ import { supabase } from '@/lib/supabase'
 import { useAuthStore } from '@/lib/auth'
 import { logger } from '@/lib/logger'
 import { optimizeImage, validateImage } from '@/lib/imageOptimization'
+import { invalidateProfile } from '@/lib/profile'
 
 type UserRole = 'player' | 'coach' | 'club'
 
@@ -247,11 +248,9 @@ export default function CompleteProfile() {
 
       logger.debug('Updated profile verified:', verifiedProfile)
 
-      // CRITICAL: Refresh the auth store
-      // This ensures DashboardRouter detects the update and redirects
-  const { fetchProfile } = useAuthStore.getState()
-  // Force refresh so routing layer sees the completed profile immediately
-  await fetchProfile(user.id, { force: true })
+    // CRITICAL: Refresh the auth store
+    // This ensures DashboardRouter detects the update and redirects
+    await invalidateProfile({ userId: user.id, reason: 'complete-profile' })
       
       logger.debug('Auth store refreshed - profile now complete')
       

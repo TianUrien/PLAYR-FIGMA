@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from 'react'
+import { useState, useEffect, useCallback, useMemo } from 'react'
 import { Search, MessageCircle } from 'lucide-react'
 import { useAuthStore } from '@/lib/auth'
 import { supabase } from '@/lib/supabase'
@@ -167,18 +167,32 @@ export default function MessagesPage() {
     }
   }, [user?.id, fetchConversations]) // Fixed: Use user?.id instead of user object
 
-  // Set up real-time subscription for new messages
-  useEffect(() => {
-    if (!user?.id) return
+  const activeConversationIds = useMemo(() => {
+    return conversations.map((conv) => conv.id).sort()
+  }, [conversations])
 
+  const conversationFilter = useMemo(() => {
+    if (activeConversationIds.length === 0) {
+      return ''
+    }
+    const quotedIds = activeConversationIds.map((id) => `"${id}"`).join(',')
+    return `conversation_id=in.(${quotedIds})`
+  }, [activeConversationIds])
+
+  // Set up scoped real-time subscription for relevant conversations only
+  useEffect(() => {
+    if (!user?.id || !conversationFilter) {
+      return
+    }
     const channel = supabase
-      .channel('messages-realtime')
+      .channel(`messages-realtime:${user.id}`)
       .on(
         'postgres_changes',
         {
           event: 'INSERT',
           schema: 'public',
-          table: 'messages'
+          table: 'messages',
+          filter: conversationFilter
         },
         () => {
           fetchConversations()
@@ -189,7 +203,8 @@ export default function MessagesPage() {
         {
           event: 'UPDATE',
           schema: 'public',
-          table: 'messages'
+          table: 'messages',
+          filter: conversationFilter
         },
         () => {
           fetchConversations()
@@ -200,7 +215,7 @@ export default function MessagesPage() {
     return () => {
       supabase.removeChannel(channel)
     }
-  }, [user?.id, fetchConversations]) // Fixed: Use user?.id instead of user object
+  }, [user?.id, conversationFilter, fetchConversations])
 
   const filteredConversations = conversations.filter((conv) =>
     conv.otherParticipant?.full_name?.toLowerCase().includes(searchQuery.toLowerCase())
@@ -212,9 +227,9 @@ export default function MessagesPage() {
     return (
       <div className="min-h-screen bg-gray-50">
         <Header />
-        <div className="flex items-center justify-center" style={{ height: 'calc(100vh - 80px)', paddingTop: '80px' }}>
+        <div className="flex items-center justify-center pt-20 h-[calc(100vh-80px)]">
           <main className="max-w-7xl mx-auto px-4 md:px-6 w-full">
-            <div className="bg-white rounded-2xl shadow-sm overflow-hidden" style={{ height: 'calc(100vh - 140px)' }}>
+            <div className="bg-white rounded-2xl shadow-sm overflow-hidden h-[calc(100vh-140px)]">
               <div className="flex h-full">
                 {/* Conversation List Skeleton */}
                 <div className="w-full md:w-96 border-r border-gray-200 flex flex-col">
@@ -248,7 +263,7 @@ export default function MessagesPage() {
       <Header />
       
       <main className="max-w-7xl mx-auto px-4 md:px-6 pt-24 pb-6">
-        <div className="bg-white rounded-2xl shadow-sm overflow-hidden" style={{ height: 'calc(100vh - 140px)' }}>
+  <div className="bg-white rounded-2xl shadow-sm overflow-hidden h-[calc(100vh-140px)]">
           <div className="flex h-full">
             {/* Left Column - Conversations List */}
             <div className={`w-full md:w-96 border-r border-gray-200 flex flex-col ${selectedConversationId ? 'hidden md:flex' : 'flex'}`}>

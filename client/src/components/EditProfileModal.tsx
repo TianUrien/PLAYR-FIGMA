@@ -1,4 +1,4 @@
-import { useState, useRef } from 'react'
+import { useCallback, useEffect, useId, useRef, useState } from 'react'
 import { X, Upload, Loader2 } from 'lucide-react'
 import { supabase } from '@/lib/supabase'
 import { useAuthStore } from '@/lib/auth'
@@ -6,6 +6,8 @@ import type { Profile } from '@/lib/database.types'
 import { Button, Input } from '@/components'
 import { logger } from '@/lib/logger'
 import { optimizeImage, validateImage } from '@/lib/imageOptimization'
+import { useFocusTrap } from '@/hooks/useFocusTrap'
+import { invalidateProfile } from '@/lib/profile'
 
 interface EditProfileModalProps {
   isOpen: boolean
@@ -14,10 +16,13 @@ interface EditProfileModalProps {
 }
 
 export default function EditProfileModal({ isOpen, onClose, role }: EditProfileModalProps) {
-  const { profile, fetchProfile, setProfile } = useAuthStore()
+  const { profile, setProfile } = useAuthStore()
   const fileInputRef = useRef<HTMLInputElement>(null)
+  const dialogRef = useRef<HTMLDivElement>(null)
+  const closeButtonRef = useRef<HTMLButtonElement | null>(null)
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')
+  const titleId = useId()
 
   const [formData, setFormData] = useState({
     full_name: profile?.full_name || '',
@@ -38,6 +43,31 @@ export default function EditProfileModal({ isOpen, onClose, role }: EditProfileM
     bio: profile?.bio || '',
     avatar_url: profile?.avatar_url || '',
   })
+
+  const handleDismiss = useCallback(() => {
+    if (loading) {
+      return
+    }
+    onClose()
+  }, [loading, onClose])
+
+  useFocusTrap({ containerRef: dialogRef, isActive: isOpen && Boolean(profile), initialFocusRef: closeButtonRef })
+
+  useEffect(() => {
+    if (!isOpen || !profile) {
+      return
+    }
+
+    const handleKeyDown = (event: KeyboardEvent) => {
+      if (event.key === 'Escape') {
+        event.preventDefault()
+        handleDismiss()
+      }
+    }
+
+    document.addEventListener('keydown', handleKeyDown)
+    return () => document.removeEventListener('keydown', handleKeyDown)
+  }, [handleDismiss, isOpen, profile])
 
   if (!isOpen || !profile) return null
 
@@ -170,7 +200,7 @@ export default function EditProfileModal({ isOpen, onClose, role }: EditProfileM
       }
 
       // Force refresh from server to pick up computed fields/triggers
-      await fetchProfile(profileId, { force: true })
+  await invalidateProfile({ userId: profileId, reason: 'profile-updated' })
     } catch (err) {
       logger.error('Profile update error:', err)
       logger.error('Error type:', typeof err)
@@ -178,7 +208,7 @@ export default function EditProfileModal({ isOpen, onClose, role }: EditProfileM
       if (previousProfile) {
         setProfile(previousProfile)
       }
-      await fetchProfile(profileId, { force: true })
+  await invalidateProfile({ userId: profileId, reason: 'profile-update-retry' })
       // Show error but don't reopen modal - user already sees their changes
       alert('Some profile changes may not have saved. Please refresh the page.')
     } finally {
@@ -187,18 +217,27 @@ export default function EditProfileModal({ isOpen, onClose, role }: EditProfileM
   }
 
   return (
-    <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4">
-      <div className="bg-white rounded-2xl max-w-2xl w-full max-h-[90vh] overflow-hidden flex flex-col">
+    <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex items-center justify-center p-4" role="presentation">
+      <div
+        ref={dialogRef}
+        className="bg-white rounded-2xl max-w-2xl w-full max-h-[90vh] overflow-hidden flex flex-col focus:outline-none"
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby={titleId}
+        tabIndex={-1}
+      >
         {/* Header */}
         <div className="flex items-center justify-between p-6 border-b border-gray-200">
-          <h2 className="text-2xl font-bold text-gray-900">
+          <h2 id={titleId} className="text-2xl font-bold text-gray-900">
             Edit {role === 'club' ? 'Club' : role === 'coach' ? 'Coach' : 'Player'} Profile
           </h2>
           <button
-            onClick={onClose}
-            className="p-2 hover:bg-gray-100 rounded-lg transition-colors"
+            ref={closeButtonRef}
+            onClick={handleDismiss}
+            className="p-2 hover:bg-gray-100 rounded-lg transition-colors disabled:opacity-50"
             aria-label="Close modal"
             title="Close"
+            disabled={loading}
           >
             <X className="w-5 h-5" />
           </button>
