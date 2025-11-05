@@ -38,6 +38,7 @@ export default function AuthCallback() {
   const navigationRef = useRef(false)
   const fallbackRef = useRef<NodeJS.Timeout | undefined>(undefined)
   const storeUnsubscribeRef = useRef<(() => void) | null>(null)
+  const hasAttemptedExchangeRef = useRef(false)
   const timelineRef = useRef({
     mountedAt: 0,
     sessionDetectedAt: 0,
@@ -56,8 +57,8 @@ export default function AuthCallback() {
   timelineRef.current.destination = ''
 
     // 🔍 Log initial state
-    const queryParams = new URLSearchParams(window.location.search)
-    const pkceCode = queryParams.get('code')
+  const queryParams = new URLSearchParams(window.location.search)
+  const pkceCode = queryParams.get('code')
     const hash = window.location.hash
     const hashParams = new URLSearchParams(hash.substring(1))
     const hasAccessToken = hashParams.has('access_token')
@@ -106,6 +107,43 @@ export default function AuthCallback() {
       if (state.profileStatus === 'missing' || (!state.loading && state.user)) {
   setStatus("Let's finish setting up your profile...")
         finalizeNavigation('/complete-profile', reason)
+      }
+    }
+
+    const attemptCodeExchange = async (code: string) => {
+      if (!code || !isMountedRef.current || hasAttemptedExchangeRef.current) {
+        return false
+      }
+
+      hasAttemptedExchangeRef.current = true
+      logger.debug('[AUTH_CALLBACK] Attempting direct PKCE code exchange')
+      if (isMountedRef.current) {
+        setStatus('Verifying your code...')
+      }
+
+      try {
+        const { data, error } = await supabase.auth.exchangeCodeForSession(code)
+
+        if (!isMountedRef.current) {
+          return false
+        }
+
+        if (error) {
+          logger.error('[AUTH_CALLBACK] Direct code exchange failed', error)
+          return false
+        }
+
+        if (data.session) {
+          logger.info('[AUTH_CALLBACK] Session established via direct exchange')
+          handleSessionDetected('direct-exchange')
+          return true
+        }
+
+        logger.warn('[AUTH_CALLBACK] Direct exchange returned no session')
+        return false
+      } catch (err) {
+        logger.error('[AUTH_CALLBACK] Exception during code exchange', err)
+        return false
       }
     }
 
@@ -277,8 +315,19 @@ export default function AuthCallback() {
       }
     }
 
-    // Start polling immediately
-    checkForSession()
+    const beginSessionResolution = async () => {
+      if (pkceCode) {
+        const exchanged = await attemptCodeExchange(pkceCode)
+        if (exchanged) {
+          return
+        }
+      }
+
+      checkForSession()
+    }
+
+    // Start the resolution flow immediately
+    beginSessionResolution()
 
     // Cleanup function
     return () => {
