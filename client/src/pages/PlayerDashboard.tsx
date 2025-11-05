@@ -231,6 +231,7 @@ export default function PlayerDashboard({ profileData, readOnly = false }: Playe
                 <h2 className="text-2xl font-bold text-gray-900 mb-6">Basic Information</h2>
 
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                  {/* Left Column */}
                   <div>
                     <label className="block text-sm font-medium text-gray-700 mb-1">
                       Full Name
@@ -238,6 +239,7 @@ export default function PlayerDashboard({ profileData, readOnly = false }: Playe
                     <p className="text-gray-900 font-medium">{profile.full_name}</p>
                   </div>
 
+                  {/* Right Column */}
                   <div>
                     <label className="block text-sm font-medium text-gray-700 mb-1">
                       Email Address
@@ -245,6 +247,7 @@ export default function PlayerDashboard({ profileData, readOnly = false }: Playe
                     <p className="text-gray-900">{profile.email}</p>
                   </div>
 
+                  {/* Left Column */}
                   <div>
                     <label className="block text-sm font-medium text-gray-700 mb-1">
                       Nationality
@@ -252,6 +255,7 @@ export default function PlayerDashboard({ profileData, readOnly = false }: Playe
                     <p className="text-gray-900">{profile.nationality}</p>
                   </div>
 
+                  {/* Right Column */}
                   <div>
                     <label className="block text-sm font-medium text-gray-700 mb-1">
                       Base Location (City)
@@ -259,6 +263,7 @@ export default function PlayerDashboard({ profileData, readOnly = false }: Playe
                     <p className="text-gray-900">{profile.base_location}</p>
                   </div>
 
+                  {/* Left Column */}
                   <div>
                     <label className="block text-sm font-medium text-gray-700 mb-1">
                       Position
@@ -268,6 +273,7 @@ export default function PlayerDashboard({ profileData, readOnly = false }: Playe
                     </p>
                   </div>
 
+                  {/* Right Column */}
                   <div>
                     <label className="block text-sm font-medium text-gray-700 mb-1">
                       Gender
@@ -277,6 +283,7 @@ export default function PlayerDashboard({ profileData, readOnly = false }: Playe
                     </p>
                   </div>
 
+                  {/* Left Column */}
                   <div>
                     <label className="block text-sm font-medium text-gray-700 mb-1">
                       Date of Birth {age && `(Age: ${age})`}
@@ -294,6 +301,7 @@ export default function PlayerDashboard({ profileData, readOnly = false }: Playe
                     )}
                   </div>
 
+                  {/* Right Column */}
                   <div>
                     <label className="block text-sm font-medium text-gray-700 mb-1">
                       Passport 1
@@ -303,21 +311,23 @@ export default function PlayerDashboard({ profileData, readOnly = false }: Playe
                     </p>
                   </div>
 
-                  {profile.passport_2 && (
-                    <div>
-                      <label className="block text-sm font-medium text-gray-700 mb-1">
-                        Passport 2
-                      </label>
-                      <p className="text-gray-900">{profile.passport_2}</p>
-                    </div>
-                  )}
-
+                  {/* Left Column */}
                   {profile.current_club && (
                     <div>
                       <label className="block text-sm font-medium text-gray-700 mb-1">
                         Current Club
                       </label>
                       <p className="text-gray-900">{profile.current_club}</p>
+                    </div>
+                  )}
+
+                  {/* Right Column */}
+                  {profile.passport_2 && (
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-1">
+                        Passport 2
+                      </label>
+                      <p className="text-gray-900">{profile.passport_2}</p>
                     </div>
                   )}
                 </div>
