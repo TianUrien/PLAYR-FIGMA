@@ -52,18 +52,23 @@ export default function MemberCard({
     setIsLoading(true)
     try {
       // Check if conversation already exists
-      const { data: existingConversation } = await supabase
+      // Use maybeSingle() instead of single() to handle 0 or 1 results gracefully
+      const { data: existingConversation, error: fetchError } = await supabase
         .from('conversations')
         .select('id')
         .or(
           `and(participant_one_id.eq.${user.id},participant_two_id.eq.${id}),and(participant_one_id.eq.${id},participant_two_id.eq.${user.id})`
         )
-        .single()
+        .maybeSingle()
+
+      // If there's a database error (not just "no results"), throw it
+      if (fetchError) throw fetchError
 
       if (existingConversation) {
+        // Conversation exists - navigate to it
         navigate(`/messages?conversation=${existingConversation.id}`)
       } else {
-        // Create new conversation
+        // No conversation found - create new one
         const { data, error } = await supabase
           .from('conversations')
           .insert({
@@ -84,6 +89,7 @@ export default function MemberCard({
       }
     } catch (error) {
       console.error('Error creating conversation:', error)
+      alert('Failed to start conversation. Please try again.')
     } finally {
       setIsLoading(false)
     }
