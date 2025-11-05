@@ -4,6 +4,7 @@ import { MessageCircle, User } from 'lucide-react'
 import { Avatar } from '@/components'
 import { useAuthStore } from '@/lib/auth'
 import { supabase } from '@/lib/supabase'
+import { requestCache } from '@/lib/requestCache'
 import { formatDistanceToNow } from 'date-fns'
 
 interface MemberCardProps {
@@ -84,6 +85,8 @@ export default function MemberCard({
         if (!newConversation) {
           throw new Error('Failed to create conversation')
         }
+
+        requestCache.invalidate(`conversations-${user.id}`)
         
         navigate(`/messages?conversation=${newConversation.id}`)
       }
