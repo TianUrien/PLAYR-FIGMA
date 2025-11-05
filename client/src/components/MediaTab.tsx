@@ -260,14 +260,16 @@ export default function MediaTab({ profileId, readOnly = false }: MediaTabProps)
                   <Upload className="w-4 h-4" />
                   Add Video Link
                 </Button>
-                <Button
-                  variant="outline"
-                  disabled
-                  className="flex items-center gap-2"
-                >
-                  <Upload className="w-4 h-4" />
-                  Upload Video
-                </Button>
+                {displayProfile?.role !== 'player' && (
+                  <Button
+                    variant="outline"
+                    disabled
+                    className="flex items-center gap-2"
+                  >
+                    <Upload className="w-4 h-4" />
+                    Upload Video
+                  </Button>
+                )}
               </div>
             )}
           </div>
