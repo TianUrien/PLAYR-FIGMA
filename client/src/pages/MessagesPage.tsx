@@ -50,11 +50,15 @@ export default function MessagesPage() {
     }
   }, [searchParams])
 
-  const fetchConversations = useCallback(async () => {
+  const fetchConversations = useCallback(async (options?: { force?: boolean }) => {
     if (!user?.id) return
 
     await monitor.measure('fetch_conversations', async () => {
       const cacheKey = `conversations-${user.id}`
+      if (options?.force) {
+        requestCache.invalidate(cacheKey)
+        logger.debug('Forcing conversations refresh due to direct navigation', { cacheKey })
+      }
       
       try {
         const enrichedConversations = await requestCache.dedupe(
@@ -166,6 +170,14 @@ export default function MessagesPage() {
       fetchConversations()
     }
   }, [user?.id, fetchConversations]) // Fixed: Use user?.id instead of user object
+
+  useEffect(() => {
+    if (!user?.id) return
+    const conversationId = searchParams.get('conversation')
+    if (conversationId) {
+      fetchConversations({ force: true })
+    }
+  }, [searchParams, user?.id, fetchConversations])
 
   const activeConversationIds = useMemo(() => {
     return conversations.map((conv) => conv.id).sort()
