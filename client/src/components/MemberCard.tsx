@@ -64,16 +64,22 @@ export default function MemberCard({
         navigate(`/messages?conversation=${existingConversation.id}`)
       } else {
         // Create new conversation
-        const { data: newConversation, error } = await supabase
+        const { data, error } = await supabase
           .from('conversations')
           .insert({
             participant_one_id: user.id,
             participant_two_id: id,
           })
           .select()
-          .single()
 
         if (error) throw error
+        
+        // Handle array response (might be swapped by trigger)
+        const newConversation = data?.[0]
+        if (!newConversation) {
+          throw new Error('Failed to create conversation')
+        }
+        
         navigate(`/messages?conversation=${newConversation.id}`)
       }
     } catch (error) {
