@@ -4,7 +4,6 @@ import { MessageCircle, User } from 'lucide-react'
 import { Avatar } from '@/components'
 import { useAuthStore } from '@/lib/auth'
 import { supabase } from '@/lib/supabase'
-import { requestCache } from '@/lib/requestCache'
 import { formatDistanceToNow } from 'date-fns'
 
 interface MemberCardProps {
@@ -69,26 +68,8 @@ export default function MemberCard({
         // Conversation exists - navigate to it
         navigate(`/messages?conversation=${existingConversation.id}`)
       } else {
-        // No conversation found - create new one
-        const { data, error } = await supabase
-          .from('conversations')
-          .insert({
-            participant_one_id: user.id,
-            participant_two_id: id,
-          })
-          .select()
-
-        if (error) throw error
-        
-        // Handle array response (might be swapped by trigger)
-        const newConversation = data?.[0]
-        if (!newConversation) {
-          throw new Error('Failed to create conversation')
-        }
-
-        requestCache.invalidate(`conversations-${user.id}`)
-        
-        navigate(`/messages?conversation=${newConversation.id}`)
+        // No conversation yet - open messages in "new conversation" mode
+        navigate(`/messages?new=${id}`)
       }
     } catch (error) {
       console.error('Error creating conversation:', error)

@@ -20,6 +20,9 @@ interface Conversation {
   id: string
   participant_one_id: string
   participant_two_id: string
+  created_at: string
+  updated_at: string
+  last_message_at: string | null
   otherParticipant?: {
     id: string
     full_name: string
@@ -27,6 +30,7 @@ interface Conversation {
     avatar_url: string | null
     role: 'player' | 'coach' | 'club'
   }
+  isPending?: boolean
 }
 
 interface ChatWindowProps {
@@ -34,9 +38,10 @@ interface ChatWindowProps {
   currentUserId: string
   onBack: () => void
   onMessageSent: () => void
+  onConversationCreated: (conversation: Conversation) => void
 }
 
-export default function ChatWindow({ conversation, currentUserId, onBack, onMessageSent }: ChatWindowProps) {
+export default function ChatWindow({ conversation, currentUserId, onBack, onMessageSent, onConversationCreated }: ChatWindowProps) {
   const [messages, setMessages] = useState<Message[]>([])
   const [newMessage, setNewMessage] = useState('')
   const [sending, setSending] = useState(false)
@@ -45,7 +50,14 @@ export default function ChatWindow({ conversation, currentUserId, onBack, onMess
   const inputRef = useRef<HTMLTextAreaElement>(null)
 
   const fetchMessages = useCallback(async () => {
+    if (!conversation.id || conversation.isPending) {
+      setMessages([])
+      setLoading(false)
+      return
+    }
+
     try {
+      setLoading(true)
       const { data, error } = await supabase
         .from('messages')
         .select('*')
@@ -60,9 +72,13 @@ export default function ChatWindow({ conversation, currentUserId, onBack, onMess
     } finally {
       setLoading(false)
     }
-  }, [conversation.id])
+  }, [conversation.id, conversation.isPending])
 
   const markMessagesAsRead = useCallback(async () => {
+    if (!conversation.id || conversation.isPending) {
+      return
+    }
+
     // Optimistically mark messages as read in UI immediately
     const now = new Date().toISOString()
     setMessages(prev => 
@@ -88,18 +104,21 @@ export default function ChatWindow({ conversation, currentUserId, onBack, onMess
       logger.error('Error marking messages as read:', error)
       // Silently fail - user already sees them as read
     }
-  }, [conversation.id, currentUserId, onMessageSent])
+  }, [conversation.id, conversation.isPending, currentUserId, onMessageSent])
 
   useEffect(() => {
-    if (conversation.id) {
-      fetchMessages()
-      markMessagesAsRead()
+    if (!conversation.id || conversation.isPending) {
+      setLoading(false)
+      return
     }
-  }, [conversation.id, fetchMessages, markMessagesAsRead])
+
+    fetchMessages()
+    markMessagesAsRead()
+  }, [conversation.id, conversation.isPending, fetchMessages, markMessagesAsRead])
 
   // Set up real-time subscription for new messages in this conversation
   useEffect(() => {
-    if (!conversation.id) return
+    if (!conversation.id || conversation.isPending) return
 
     const channel = supabase
       .channel(`conversation-${conversation.id}`)
@@ -145,7 +164,7 @@ export default function ChatWindow({ conversation, currentUserId, onBack, onMess
     return () => {
       supabase.removeChannel(channel)
     }
-  }, [conversation.id, currentUserId, onMessageSent, markMessagesAsRead]) // Fixed: Proper dependencies
+  }, [conversation.id, conversation.isPending, currentUserId, onMessageSent, markMessagesAsRead]) // Fixed: Proper dependencies
 
   // Auto-scroll to bottom when new messages arrive
   useEffect(() => {
@@ -167,66 +186,160 @@ export default function ChatWindow({ conversation, currentUserId, onBack, onMess
     }
 
     setSending(true)
-    
-    // Generate idempotency key and optimistic message ID
-    const idempotencyKey = `${currentUserId}-${Date.now()}-${Math.random()}`
-    const optimisticId = `optimistic-${idempotencyKey}`
-    
-    // Create optimistic message for immediate UI feedback
-    const optimisticMessage: Message = {
-      id: optimisticId,
-      conversation_id: conversation.id,
-      sender_id: currentUserId,
-      content: messageContent,
-      sent_at: new Date().toISOString(),
-      read_at: null
-    }
-    
-    // Add optimistic message immediately
-    setMessages(prev => [...prev, optimisticMessage])
-    setNewMessage('')
-    inputRef.current?.focus()
-    
-    await monitor.measure('send_message', async () => {
-      try {
-        // Send message with retry logic
-        const result = await withRetry(async () => {
-          const res = await supabase.from('messages').insert({
-            conversation_id: conversation.id,
-            sender_id: currentUserId,
-            content: messageContent,
-            idempotency_key: idempotencyKey
-          }).select()
-          if (res.error) throw res.error
-          return res
-        })
+    const otherParticipantId =
+      conversation.participant_one_id === currentUserId
+        ? conversation.participant_two_id
+        : conversation.participant_one_id
 
-        const { data, error } = result
-        if (error) throw error
-
-        // Replace optimistic message with real message from server
-        if (data && data[0]) {
-          logger.debug('Message sent successfully, replacing optimistic message')
-          setMessages(prev => prev.map(msg => 
-            msg.id === optimisticId ? data[0] : msg
-          ))
-        }
-
-        onMessageSent()
-      } catch (error) {
-        logger.error('Error sending message:', error)
-        // Remove optimistic message on failure
-        setMessages(prev => prev.filter(msg => msg.id !== optimisticId))
-        // Restore the message content so user can retry
-        setNewMessage(messageContent)
-        alert('Failed to send message. Please try again.')
-        throw error
-      }
-    }, {
-      conversationId: conversation.id
-    }).finally(() => {
+    if (!otherParticipantId) {
+      logger.error('Cannot determine recipient for conversation', { conversation })
       setSending(false)
-    })
+      return
+    }
+
+    let activeConversationId: string | null = conversation.isPending ? null : conversation.id
+    let newlyCreatedConversation: Conversation | null = null
+    let optimisticId: string | null = null
+    let conversationCreatedForSend = false
+
+    try {
+      if (!activeConversationId) {
+        try {
+          const result = await withRetry(async () => {
+            const response = await supabase
+              .from('conversations')
+              .insert({
+                participant_one_id: currentUserId,
+                participant_two_id: otherParticipantId
+              })
+              .select()
+            if (response.error) throw response.error
+            return response
+          })
+
+          const createdConversation = result.data?.[0]
+          if (!createdConversation) {
+            throw new Error('Failed to create conversation')
+          }
+
+          activeConversationId = createdConversation.id
+          newlyCreatedConversation = {
+            ...createdConversation,
+            otherParticipant: conversation.otherParticipant,
+            isPending: false
+          }
+          conversationCreatedForSend = true
+        } catch (creationError: unknown) {
+          const parsedError = creationError as { code?: string; message?: string; details?: string }
+          const isUniqueViolation =
+            parsedError?.code === '23505' ||
+            parsedError?.message?.includes('duplicate key value') ||
+            parsedError?.details?.includes('already exists')
+
+          if (!isUniqueViolation) {
+            throw creationError
+          }
+
+          const { data: existingConversation, error: existingConversationError } = await supabase
+            .from('conversations')
+            .select('*')
+            .or(
+              `and(participant_one_id.eq.${currentUserId},participant_two_id.eq.${otherParticipantId}),and(participant_one_id.eq.${otherParticipantId},participant_two_id.eq.${currentUserId})`
+            )
+            .maybeSingle()
+
+          if (existingConversationError) {
+            throw existingConversationError
+          }
+
+          if (!existingConversation) {
+            throw creationError
+          }
+
+          // Race condition: conversation already exists, reuse it instead of failing
+          activeConversationId = existingConversation.id
+          newlyCreatedConversation = {
+            ...existingConversation,
+            otherParticipant: conversation.otherParticipant,
+            isPending: false
+          }
+        }
+      }
+
+      const idempotencyKey = `${currentUserId}-${Date.now()}-${Math.random()}`
+      optimisticId = `optimistic-${idempotencyKey}`
+
+      const optimisticMessage: Message = {
+        id: optimisticId,
+        conversation_id: activeConversationId,
+        sender_id: currentUserId,
+        content: messageContent,
+        sent_at: new Date().toISOString(),
+        read_at: null
+      }
+
+      setMessages((prev) => [...prev, optimisticMessage])
+      setNewMessage('')
+      inputRef.current?.focus()
+
+      const conversationIdForMetrics = activeConversationId
+
+      await monitor.measure(
+        'send_message',
+        async () => {
+          const result = await withRetry(async () => {
+            const res = await supabase
+              .from('messages')
+              .insert({
+                conversation_id: conversationIdForMetrics,
+                sender_id: currentUserId,
+                content: messageContent,
+                idempotency_key: idempotencyKey
+              })
+              .select()
+
+            if (res.error) throw res.error
+            return res
+          })
+
+          const { data, error } = result
+          if (error) throw error
+
+          if (data && data[0]) {
+            logger.debug('Message sent successfully, replacing optimistic message')
+            setMessages((prev) => prev.map((msg) => (msg.id === optimisticId ? data[0] : msg)))
+          }
+        },
+        { conversationId: conversationIdForMetrics }
+      )
+
+      onMessageSent() // Notify parent for badge updates only
+
+      if (newlyCreatedConversation) {
+        onConversationCreated(newlyCreatedConversation)
+      }
+    } catch (error) {
+      logger.error('Error sending message:', error)
+      if (optimisticId) {
+        setMessages((prev) => prev.filter((msg) => msg.id !== optimisticId))
+      }
+      setNewMessage(messageContent)
+
+      if (conversationCreatedForSend && newlyCreatedConversation) {
+        try {
+          await supabase
+            .from('conversations')
+            .delete()
+            .eq('id', newlyCreatedConversation.id)
+        } catch (cleanupError) {
+          logger.error('Failed to rollback empty conversation after send failure', cleanupError)
+        }
+      }
+
+      alert('Failed to send message. Please try again.')
+    } finally {
+      setSending(false)
+    }
   }
 
   const handleKeyDown = (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
@@ -387,8 +500,7 @@ export default function ChatWindow({ conversation, currentUserId, onBack, onMess
               onKeyDown={handleKeyDown}
               placeholder="Type a message..."
               rows={1}
-              className="w-full px-4 py-3 bg-gray-50 border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-purple-500 focus:border-transparent resize-none"
-              style={{ minHeight: '48px', maxHeight: '120px' }}
+              className="w-full px-4 py-3 bg-gray-50 border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-purple-500 focus:border-transparent resize-none min-h-[48px] max-h-[120px]"
             />
             <div className="absolute bottom-2 right-2 text-xs text-gray-400">
               {newMessage.length}/1000

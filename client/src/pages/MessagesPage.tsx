@@ -32,12 +32,14 @@ interface Conversation {
     sender_id: string
   }
   unreadCount?: number
+  isPending?: boolean
 }
 
 export default function MessagesPage() {
   const { user } = useAuthStore()
-  const [searchParams] = useSearchParams()
+  const [searchParams, setSearchParams] = useSearchParams()
   const [conversations, setConversations] = useState<Conversation[]>([])
+  const [pendingConversation, setPendingConversation] = useState<Conversation | null>(null)
   const [selectedConversationId, setSelectedConversationId] = useState<string | null>(null)
   const [searchQuery, setSearchQuery] = useState('')
   const [loading, setLoading] = useState(true)
@@ -47,6 +49,12 @@ export default function MessagesPage() {
     const conversationId = searchParams.get('conversation')
     if (conversationId) {
       setSelectedConversationId(conversationId)
+      return
+    }
+
+    const pendingUserId = searchParams.get('new')
+    if (!pendingUserId) {
+      setSelectedConversationId(null)
     }
   }, [searchParams])
 
@@ -171,13 +179,101 @@ export default function MessagesPage() {
     }
   }, [user?.id, fetchConversations]) // Fixed: Use user?.id instead of user object
 
+  // Remove forced refresh on navigation - rely on real-time updates instead
+
   useEffect(() => {
     if (!user?.id) return
-    const conversationId = searchParams.get('conversation')
-    if (conversationId) {
-      fetchConversations({ force: true })
+
+    const targetUserId = searchParams.get('new')
+
+    if (!targetUserId) {
+      setPendingConversation(null)
+      return
     }
-  }, [searchParams, user?.id, fetchConversations])
+
+    if (targetUserId === user.id) {
+      logger.warn('Ignoring request to start conversation with self', { targetUserId })
+      setPendingConversation(null)
+      return
+    }
+
+    const existingConversation = conversations.find(
+      (conv) =>
+        (conv.participant_one_id === user.id && conv.participant_two_id === targetUserId) ||
+        (conv.participant_two_id === user.id && conv.participant_one_id === targetUserId)
+    )
+
+    if (existingConversation) {
+      setPendingConversation(null)
+      setSelectedConversationId(existingConversation.id)
+      setSearchParams((prev) => {
+        const next = new URLSearchParams(prev)
+        next.set('conversation', existingConversation.id)
+        next.delete('new')
+        return next
+      })
+      return
+    }
+
+    if (
+      pendingConversation &&
+      ((pendingConversation.participant_one_id === user.id && pendingConversation.participant_two_id === targetUserId) ||
+        (pendingConversation.participant_two_id === user.id && pendingConversation.participant_one_id === targetUserId))
+    ) {
+      setSelectedConversationId(pendingConversation.id)
+      return
+    }
+
+    let isCancelled = false
+
+    const loadPendingParticipant = async () => {
+      try {
+        const { data, error } = await supabase
+          .from('profiles')
+          .select('id, full_name, username, avatar_url, role')
+          .eq('id', targetUserId)
+          .maybeSingle()
+
+        if (isCancelled) return
+
+        if (error || !data) {
+          logger.error('Failed to load participant for pending conversation', { error, targetUserId })
+          setPendingConversation(null)
+          return
+        }
+
+        const pendingId = `pending-${targetUserId}`
+        setPendingConversation({
+          id: pendingId,
+          participant_one_id: user.id,
+          participant_two_id: targetUserId,
+          created_at: new Date().toISOString(),
+          updated_at: new Date().toISOString(),
+          last_message_at: null,
+          otherParticipant: {
+            id: data.id,
+            full_name: data.full_name,
+            username: data.username,
+            avatar_url: data.avatar_url,
+            role: ((data.role ?? 'player') as 'player' | 'coach' | 'club')
+          },
+          unreadCount: 0,
+          isPending: true
+        })
+        setSelectedConversationId(pendingId)
+      } catch (error) {
+        if (isCancelled) return
+        logger.error('Unexpected error loading pending conversation', { error, targetUserId })
+        setPendingConversation(null)
+      }
+    }
+
+    loadPendingParticipant()
+
+    return () => {
+      isCancelled = true
+    }
+  }, [searchParams, user?.id, conversations, pendingConversation, setSearchParams])
 
   const activeConversationIds = useMemo(() => {
     return conversations.map((conv) => conv.id).sort()
@@ -229,11 +325,107 @@ export default function MessagesPage() {
     }
   }, [user?.id, conversationFilter, fetchConversations])
 
-  const filteredConversations = conversations.filter((conv) =>
+  const combinedConversations = useMemo(() => {
+    if (!pendingConversation) return conversations
+
+    const duplicateExists = conversations.some(
+      (conv) =>
+        (conv.participant_one_id === pendingConversation.participant_one_id &&
+          conv.participant_two_id === pendingConversation.participant_two_id) ||
+        (conv.participant_one_id === pendingConversation.participant_two_id &&
+          conv.participant_two_id === pendingConversation.participant_one_id)
+    )
+
+    if (duplicateExists) {
+      return conversations
+    }
+
+    return [pendingConversation, ...conversations]
+  }, [conversations, pendingConversation])
+
+  const filteredConversations = combinedConversations.filter((conv) =>
     conv.otherParticipant?.full_name?.toLowerCase().includes(searchQuery.toLowerCase())
   )
 
-  const selectedConversation = conversations.find((conv) => conv.id === selectedConversationId)
+  const selectedConversation = combinedConversations.find((conv) => conv.id === selectedConversationId)
+
+  const handleSelectConversation = useCallback(
+    (conversationId: string) => {
+      setSelectedConversationId(conversationId)
+
+      const selected = combinedConversations.find((conv) => conv.id === conversationId)
+
+      setSearchParams((prev) => {
+        const next = new URLSearchParams(prev)
+
+        if (selected?.isPending) {
+          const targetId =
+            selected.participant_one_id === user?.id
+              ? selected.participant_two_id
+              : selected.participant_one_id
+
+          if (targetId) {
+            next.set('new', targetId)
+          }
+          next.delete('conversation')
+        } else {
+          next.set('conversation', conversationId)
+          next.delete('new')
+        }
+
+        return next
+      })
+    },
+    [combinedConversations, setSearchParams, user?.id]
+  )
+
+  const handleBackToList = useCallback(() => {
+    setSelectedConversationId(null)
+    setPendingConversation(null)
+    setSearchParams((prev) => {
+      const next = new URLSearchParams(prev)
+      next.delete('conversation')
+      next.delete('new')
+      return next
+    })
+  }, [setSearchParams])
+
+  const handleConversationCreated = useCallback(
+    (createdConversation: Conversation) => {
+      setPendingConversation(null)
+      setSelectedConversationId(createdConversation.id)
+
+      // Optimistically add/update conversation in local state
+      setConversations((prev) => {
+        const existingIndex = prev.findIndex((conv) => conv.id === createdConversation.id)
+        const normalizedConversation: Conversation = {
+          ...createdConversation,
+          last_message_at: createdConversation.last_message_at ?? createdConversation.updated_at,
+          unreadCount: createdConversation.unreadCount ?? 0
+        }
+
+        if (existingIndex >= 0) {
+          const next = [...prev]
+          next[existingIndex] = {
+            ...next[existingIndex],
+            ...normalizedConversation
+          }
+          return next
+        }
+
+        return [normalizedConversation, ...prev]
+      })
+
+      setSearchParams((prev) => {
+        const next = new URLSearchParams(prev)
+        next.set('conversation', createdConversation.id)
+        next.delete('new')
+        return next
+      })
+      // Don't force refresh - real-time subscription will handle updates
+    },
+    [setSearchParams]
+  )
 
   if (loading) {
     return (
@@ -312,7 +504,7 @@ export default function MessagesPage() {
                   <ConversationList
                     conversations={filteredConversations}
                     selectedConversationId={selectedConversationId}
-                    onSelectConversation={setSelectedConversationId}
+                    onSelectConversation={handleSelectConversation}
                     currentUserId={user?.id || ''}
                   />
                 )}
@@ -325,8 +517,12 @@ export default function MessagesPage() {
                 <ChatWindow
                   conversation={selectedConversation}
                   currentUserId={user?.id || ''}
-                  onBack={() => setSelectedConversationId(null)}
-                  onMessageSent={fetchConversations}
+                  onBack={handleBackToList}
+                  onMessageSent={() => {
+                    // Mark messages as read, but don't force full refresh
+                    // Real-time subscription will handle conversation list updates
+                  }}
+                  onConversationCreated={handleConversationCreated}
                 />
               ) : (
                 <div className="flex flex-col items-center justify-center h-full p-8 text-center bg-gray-50">
