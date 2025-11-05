@@ -1,7 +1,7 @@
 import { useState, useEffect, useRef, useCallback } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { Menu, X, MessageCircle, LogOut, Users, Briefcase, LayoutDashboard, Settings } from 'lucide-react'
-import { Avatar } from '@/components'
+import { Avatar, NotificationBadge } from '@/components'
 import { useAuthStore } from '@/lib/auth'
 import { supabase } from '@/lib/supabase'
 import { monitor } from '@/lib/monitor'
@@ -153,11 +153,7 @@ export default function Header() {
                     <MessageCircle className="w-5 h-5" />
                     <span>Messages</span>
                   </div>
-                  {unreadCount > 0 && (
-                    <span className="absolute -top-1 -right-1 w-5 h-5 bg-red-500 text-white text-xs rounded-full flex items-center justify-center font-semibold">
-                      {unreadCount > 9 ? '9+' : unreadCount}
-                    </span>
-                  )}
+                  <NotificationBadge count={unreadCount} />
                 </button>
                 <button
                   onClick={() => navigate('/dashboard/profile')}
@@ -314,11 +310,10 @@ export default function Header() {
                   <div className="flex items-center gap-2">
                     <MessageCircle className="w-5 h-5" />
                     <span>Messages</span>
-                    {unreadCount > 0 && (
-                      <span className="ml-auto w-6 h-6 bg-red-500 text-white text-xs rounded-full flex items-center justify-center font-semibold">
-                        {unreadCount > 9 ? '9+' : unreadCount}
-                      </span>
-                    )}
+                    <NotificationBadge 
+                      count={unreadCount} 
+                      className="notification-badge--inline"
+                    />
                   </div>
                 </button>
                 <button
