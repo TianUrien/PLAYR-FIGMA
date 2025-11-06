@@ -294,6 +294,16 @@ export default function MessagesPage() {
   const handleSelectConversation = useCallback(
     (conversationId: string) => {
       setSelectedConversationId(conversationId)
+      setConversations(prev =>
+        prev.map(conv =>
+          conv.id === conversationId
+            ? {
+                ...conv,
+                unreadCount: 0
+              }
+            : conv
+        )
+      )
 
       const selected = combinedConversations.find((conv) => conv.id === conversationId)
 
@@ -367,6 +377,26 @@ export default function MessagesPage() {
       // Don't force refresh - real-time subscription will handle updates
     },
     [setSearchParams]
+  )
+
+  const handleConversationRead = useCallback(
+    (conversationId: string) => {
+      setConversations(prev =>
+        prev.map(conv =>
+          conv.id === conversationId
+            ? {
+                ...conv,
+                unreadCount: 0
+              }
+            : conv
+        )
+      )
+
+      if (user?.id) {
+        requestCache.invalidate(`conversations-${user.id}`)
+      }
+    },
+    [user?.id]
   )
 
   if (loading) {
@@ -465,6 +495,7 @@ export default function MessagesPage() {
                     // Real-time subscription will handle conversation list updates
                   }}
                   onConversationCreated={handleConversationCreated}
+                  onConversationRead={handleConversationRead}
                 />
               ) : (
                 <div className="flex flex-col items-center justify-center h-full p-8 text-center bg-gray-50">

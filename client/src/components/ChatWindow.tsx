@@ -44,9 +44,10 @@ interface ChatWindowProps {
   onBack: () => void
   onMessageSent: () => void
   onConversationCreated: (conversation: Conversation) => void
+  onConversationRead?: (conversationId: string) => void
 }
 
-export default function ChatWindow({ conversation, currentUserId, onBack, onMessageSent, onConversationCreated }: ChatWindowProps) {
+export default function ChatWindow({ conversation, currentUserId, onBack, onMessageSent, onConversationCreated, onConversationRead }: ChatWindowProps) {
   const [messages, setMessages] = useState<Message[]>([])
   const [newMessage, setNewMessage] = useState('')
   const [sending, setSending] = useState(false)
@@ -102,15 +103,15 @@ export default function ChatWindow({ conversation, currentUserId, onBack, onMess
   }, [conversation.id, conversation.isPending, syncMessagesState])
 
   const markMessagesAsRead = useCallback(
-    async (messagesOverride?: Message[]) => {
+    async (messagesOverride?: Message[]): Promise<number> => {
       if (!conversation.id || conversation.isPending) {
-        return
+        return 0
       }
 
       const snapshot = messagesOverride ?? messagesRef.current
       if (!snapshot.length) {
         logger.debug('No messages loaded yet, skipping mark-as-read')
-        return
+        return 0
       }
 
       const unreadMessages = snapshot.filter(
@@ -120,7 +121,7 @@ export default function ChatWindow({ conversation, currentUserId, onBack, onMess
 
       if (unreadCount === 0) {
         logger.debug('No unread messages to mark, skipping')
-        return
+        return 0
       }
 
       logger.debug(`Found ${unreadCount} unread messages to mark as read`)
@@ -163,10 +164,15 @@ export default function ChatWindow({ conversation, currentUserId, onBack, onMess
           unreadCount
         })
 
+        if (onConversationRead) {
+          onConversationRead(conversation.id)
+        }
+
         requestCache.invalidate(cacheKey)
         if (typeof window !== 'undefined' && window.__refreshUnreadBadge) {
           window.__refreshUnreadBadge()
         }
+        return unreadCount
       } catch (error) {
         logger.error('Error marking messages as read in database:', error)
 
@@ -174,10 +180,11 @@ export default function ChatWindow({ conversation, currentUserId, onBack, onMess
           window.__updateUnreadBadge(unreadCount)
         }
 
-        syncMessagesState(messagesOverride ? snapshot : messagesRef.current)
+        syncMessagesState(snapshot)
+        return -unreadCount
       }
     },
-    [conversation.id, conversation.isPending, currentUserId, onMessageSent, syncMessagesState]
+    [conversation.id, conversation.isPending, currentUserId, onConversationRead, onMessageSent, syncMessagesState]
   )
 
   useEffect(() => {
@@ -189,17 +196,23 @@ export default function ChatWindow({ conversation, currentUserId, onBack, onMess
 
     let cancelled = false
 
-    fetchMessages().then(fetched => {
-      if (!cancelled) {
-        markMessagesAsRead(fetched)
-      }
-    })
+    const loadConversation = async () => {
+      const fetched = await fetchMessages()
+      if (cancelled) return
 
-    const cacheKey = generateCacheKey('unread_count', { userId: currentUserId })
-    requestCache.invalidate(cacheKey)
-    if (typeof window !== 'undefined' && window.__refreshUnreadBadge) {
-      window.__refreshUnreadBadge()
+      const marked = await markMessagesAsRead(fetched)
+      if (cancelled) return
+
+      if (marked <= 0) {
+        const cacheKey = generateCacheKey('unread_count', { userId: currentUserId })
+        requestCache.invalidate(cacheKey)
+        if (typeof window !== 'undefined' && window.__refreshUnreadBadge) {
+          window.__refreshUnreadBadge()
+        }
+      }
     }
+
+    loadConversation()
 
     return () => {
       cancelled = true
