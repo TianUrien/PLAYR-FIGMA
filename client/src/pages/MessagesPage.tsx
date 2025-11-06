@@ -10,7 +10,6 @@ import { ConversationSkeleton } from '@/components/Skeleton'
 import { requestCache } from '@/lib/requestCache'
 import { monitor } from '@/lib/monitor'
 import { logger } from '@/lib/logger'
-import { withRetry } from '@/lib/retry'
 
 interface Conversation {
   id: string
@@ -72,96 +71,39 @@ export default function MessagesPage() {
         const enrichedConversations = await requestCache.dedupe(
           cacheKey,
           async () => {
-            // Fetch conversations where user is a participant - with retry
-            const conversationsResult = await withRetry(async () => {
-              const result = await supabase
-                .from('conversations')
-                .select('*')
-                .or(`participant_one_id.eq.${user.id},participant_two_id.eq.${user.id}`)
-                .order('last_message_at', { ascending: false, nullsFirst: false })
-              if (result.error) throw result.error
-              return result
-            })
+            // Use optimized stored procedure (single query, ~50-150ms)
+            const { data, error } = await supabase
+              .rpc('get_user_conversations', {
+                p_user_id: user.id,
+                p_limit: 50
+              })
 
-            const { data: conversationsData, error: conversationsError } = conversationsResult
-            if (conversationsError) throw conversationsError
-            if (!conversationsData || conversationsData.length === 0) return []
+            if (error) throw error
 
-            // Extract all participant IDs (not the current user)
-            const otherParticipantIds = conversationsData.map(conv => 
-              conv.participant_one_id === user.id ? conv.participant_two_id : conv.participant_one_id
-            )
-
-            // Batch fetch all profiles in a single query - with retry
-            const profilesResult = await withRetry(async () => {
-              const result = await supabase
-                .from('profiles')
-                .select('id, full_name, username, avatar_url, role')
-                .in('id', otherParticipantIds)
-              if (result.error) throw result.error
-              return result
-            })
-            const { data: profilesData } = profilesResult
-
-            // Create a map for fast lookup
-            const profilesMap = new Map(
-              (profilesData || []).map(p => [p.id, p])
-            )
-
-            // Extract all conversation IDs
-            const conversationIds = conversationsData.map(conv => conv.id)
-
-            // Batch fetch last messages - use a subquery approach
-            // Get all messages for these conversations, ordered, then filter to first per conversation
-            const { data: messagesData } = await supabase
-              .from('messages')
-              .select('conversation_id, content, sent_at, sender_id')
-              .in('conversation_id', conversationIds)
-              .order('sent_at', { ascending: false })
-
-            // Group messages by conversation and take the first (most recent) for each
-            const lastMessagesMap = new Map()
-            messagesData?.forEach(msg => {
-              if (!lastMessagesMap.has(msg.conversation_id)) {
-                lastMessagesMap.set(msg.conversation_id, msg)
-              }
-            })
-
-            // Batch fetch unread messages and count client-side
-            const { data: unreadMessagesData } = await supabase
-              .from('messages')
-              .select('conversation_id')
-              .in('conversation_id', conversationIds)
-              .neq('sender_id', user.id)
-              .is('read_at', null)
-
-            // Count unread messages per conversation
-            const unreadCountsMap = new Map()
-            unreadMessagesData?.forEach(msg => {
-              const currentCount = unreadCountsMap.get(msg.conversation_id) || 0
-              unreadCountsMap.set(msg.conversation_id, currentCount + 1)
-            })
-
-            // Enrich conversations with the fetched data
-            return conversationsData.map(conv => {
-              const otherParticipantId = conv.participant_one_id === user.id 
-                ? conv.participant_two_id 
-                : conv.participant_one_id
-              
-              const profileData = profilesMap.get(otherParticipantId)
-
-              return {
-                ...conv,
-                otherParticipant: profileData ? {
-                  ...profileData,
-                  role: profileData.role as 'player' | 'coach' | 'club'
-                } : undefined,
-                lastMessage: lastMessagesMap.get(conv.id) || undefined,
-                unreadCount: unreadCountsMap.get(conv.id) || 0
-              }
-            })
+            // Transform RPC result to expected Conversation format
+            return (data || []).map(row => ({
+              id: row.conversation_id,
+              participant_one_id: user.id,
+              participant_two_id: row.other_participant_id,
+              created_at: row.conversation_created_at,
+              updated_at: row.conversation_updated_at,
+              last_message_at: row.conversation_last_message_at,
+              otherParticipant: row.other_participant_name ? {
+                id: row.other_participant_id,
+                full_name: row.other_participant_name,
+                username: row.other_participant_username,
+                avatar_url: row.other_participant_avatar,
+                role: row.other_participant_role as 'player' | 'coach' | 'club'
+              } : undefined,
+              lastMessage: row.last_message_content ? {
+                content: row.last_message_content,
+                sent_at: row.last_message_sent_at,
+                sender_id: row.last_message_sender_id
+              } : undefined,
+              unreadCount: Number(row.unread_count) || 0
+            }))
           },
-          15000 // 15 second cache for conversations
+          60000 // Cache for 60 seconds (increased from 15s)
         )
 
         setConversations(enrichedConversations)
@@ -252,7 +194,7 @@ export default function MessagesPage() {
           last_message_at: null,
           otherParticipant: {
             id: data.id,
-            full_name: data.full_name,
+            full_name: data.full_name || '',
             username: data.username,
             avatar_url: data.avatar_url,
             role: ((data.role ?? 'player') as 'player' | 'coach' | 'club')

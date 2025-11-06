@@ -39,6 +39,56 @@ export type Database = {
   }
   public: {
     Tables: {
+      club_media: {
+        Row: {
+          alt_text: string | null
+          caption: string | null
+          club_id: string
+          created_at: string
+          file_name: string
+          file_size: number
+          file_url: string
+          id: string
+          is_featured: boolean
+          order_index: number
+          updated_at: string
+        }
+        Insert: {
+          alt_text?: string | null
+          caption?: string | null
+          club_id: string
+          created_at?: string
+          file_name: string
+          file_size: number
+          file_url: string
+          id?: string
+          is_featured?: boolean
+          order_index?: number
+          updated_at?: string
+        }
+        Update: {
+          alt_text?: string | null
+          caption?: string | null
+          club_id?: string
+          created_at?: string
+          file_name?: string
+          file_size?: number
+          file_url?: string
+          id?: string
+          is_featured?: boolean
+          order_index?: number
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "club_media_club_id_fkey"
+            columns: ["club_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       conversations: {
         Row: {
           created_at: string
@@ -104,55 +154,6 @@ export type Database = {
           user_id?: string
         }
         Relationships: []
-      }
-      club_media: {
-        Row: {
-          id: string
-          club_id: string
-          file_url: string
-          file_name: string
-          file_size: number
-          caption: string | null
-          alt_text: string | null
-          order_index: number
-          is_featured: boolean
-          created_at: string
-          updated_at: string
-        }
-        Insert: {
-          id?: string
-          club_id: string
-          file_url: string
-          file_name: string
-          file_size: number
-          caption?: string | null
-          alt_text?: string | null
-          order_index?: number
-          is_featured?: boolean
-          created_at?: string
-          updated_at?: string
-        }
-        Update: {
-          id?: string
-          club_id?: string
-          file_url?: string
-          file_name?: string
-          file_size?: number
-          caption?: string | null
-          alt_text?: string | null
-          order_index?: number
-          is_featured?: boolean
-          created_at?: string
-          updated_at?: string
-        }
-        Relationships: [
-          {
-            foreignKeyName: "club_media_club_id_fkey"
-            columns: ["club_id"]
-            referencedRelation: "profiles"
-            referencedColumns: ["id"]
-          }
-        ]
       }
       messages: {
         Row: {
@@ -241,7 +242,7 @@ export type Database = {
       profiles: {
         Row: {
           avatar_url: string | null
-          base_location: string
+          base_location: string | null
           bio: string | null
           club_bio: string | null
           club_history: string | null
@@ -250,12 +251,13 @@ export type Database = {
           current_club: string | null
           date_of_birth: string | null
           email: string
-          full_name: string
+          full_name: string | null
           gender: string | null
           highlight_video_url: string | null
           id: string
           league_division: string | null
-          nationality: string
+          nationality: string | null
+          onboarding_completed: boolean
           passport_1: string | null
           passport_2: string | null
           position: string | null
@@ -268,7 +270,7 @@ export type Database = {
         }
         Insert: {
           avatar_url?: string | null
-          base_location: string
+          base_location?: string | null
           bio?: string | null
           club_bio?: string | null
           club_history?: string | null
@@ -277,12 +279,13 @@ export type Database = {
           current_club?: string | null
           date_of_birth?: string | null
           email: string
-          full_name: string
+          full_name?: string | null
           gender?: string | null
           highlight_video_url?: string | null
           id: string
           league_division?: string | null
-          nationality: string
+          nationality?: string | null
+          onboarding_completed?: boolean
           passport_1?: string | null
           passport_2?: string | null
           position?: string | null
@@ -295,7 +298,7 @@ export type Database = {
         }
         Update: {
           avatar_url?: string | null
-          base_location?: string
+          base_location?: string | null
           bio?: string | null
           club_bio?: string | null
           club_history?: string | null
@@ -304,12 +307,13 @@ export type Database = {
           current_club?: string | null
           date_of_birth?: string | null
           email?: string
-          full_name?: string
+          full_name?: string | null
           gender?: string | null
           highlight_video_url?: string | null
           id?: string
           league_division?: string | null
-          nationality?: string
+          nationality?: string | null
+          onboarding_completed?: boolean
           passport_1?: string | null
           passport_2?: string | null
           position?: string | null
@@ -461,15 +465,156 @@ export type Database = {
       }
     }
     Views: {
-      [_ in never]: never
+      user_unread_counts: {
+        Row: {
+          unread_count: number | null
+          user_id: string | null
+        }
+        Relationships: []
+      }
+      user_unread_counts_secure: {
+        Row: {
+          unread_count: number | null
+          user_id: string | null
+        }
+        Relationships: []
+      }
     }
     Functions: {
-      acquire_profile_lock: {
-        Args: { profile_id: string }
-        Returns: boolean
+      acquire_profile_lock: { Args: { profile_id: string }; Returns: boolean }
+      complete_user_profile: {
+        Args: {
+          p_base_location: string
+          p_club_bio?: string
+          p_contact_email?: string
+          p_date_of_birth?: string
+          p_full_name: string
+          p_gender?: string
+          p_league_division?: string
+          p_nationality: string
+          p_passport_1?: string
+          p_passport_2?: string
+          p_position?: string
+          p_user_id: string
+          p_website?: string
+          p_year_founded?: number
+        }
+        Returns: {
+          avatar_url: string | null
+          base_location: string | null
+          bio: string | null
+          club_bio: string | null
+          club_history: string | null
+          contact_email: string | null
+          created_at: string
+          current_club: string | null
+          date_of_birth: string | null
+          email: string
+          full_name: string | null
+          gender: string | null
+          highlight_video_url: string | null
+          id: string
+          league_division: string | null
+          nationality: string | null
+          onboarding_completed: boolean
+          passport_1: string | null
+          passport_2: string | null
+          position: string | null
+          role: string
+          updated_at: string
+          username: string | null
+          version: number
+          website: string | null
+          year_founded: number | null
+        }
+        SetofOptions: {
+          from: "*"
+          to: "profiles"
+          isOneToOne: true
+          isSetofReturn: false
+        }
       }
-      release_profile_lock: {
-        Args: { profile_id: string }
+      create_profile_for_new_user: {
+        Args: { user_email: string; user_id: string; user_role?: string }
+        Returns: {
+          avatar_url: string | null
+          base_location: string | null
+          bio: string | null
+          club_bio: string | null
+          club_history: string | null
+          contact_email: string | null
+          created_at: string
+          current_club: string | null
+          date_of_birth: string | null
+          email: string
+          full_name: string | null
+          gender: string | null
+          highlight_video_url: string | null
+          id: string
+          league_division: string | null
+          nationality: string | null
+          onboarding_completed: boolean
+          passport_1: string | null
+          passport_2: string | null
+          position: string | null
+          role: string
+          updated_at: string
+          username: string | null
+          version: number
+          website: string | null
+          year_founded: number | null
+        }
+        SetofOptions: {
+          from: "*"
+          to: "profiles"
+          isOneToOne: true
+          isSetofReturn: false
+        }
+      }
+      ensure_profile_exists: {
+        Args: { user_email: string; user_id: string; user_role?: string }
+        Returns: undefined
+      }
+      find_zombie_accounts: {
+        Args: never
+        Returns: {
+          created_at: string
+          email: string
+          email_confirmed_at: string
+          intended_role: string
+          profile_complete: boolean
+          profile_exists: boolean
+          user_id: string
+        }[]
+      }
+      get_user_conversations: {
+        Args: { p_limit?: number; p_user_id: string }
+        Returns: {
+          conversation_created_at: string
+          conversation_id: string
+          conversation_last_message_at: string
+          conversation_updated_at: string
+          last_message_content: string
+          last_message_sender_id: string
+          last_message_sent_at: string
+          other_participant_avatar: string
+          other_participant_id: string
+          other_participant_name: string
+          other_participant_role: string
+          other_participant_username: string
+          unread_count: number
+        }[]
+      }
+      recover_zombie_accounts: {
+        Args: never
+        Returns: {
+          action_taken: string
+          user_id: string
+        }[]
+      }
+      release_profile_lock: { Args: { profile_id: string }; Returns: boolean }
+      user_in_conversation: {
+        Args: { p_conversation_id: string; p_user_id: string }
         Returns: boolean
       }
     }
@@ -634,41 +779,3 @@ export const Constants = {
     },
   },
 } as const
-
-// Convenient type exports
-export type Profile = Database['public']['Tables']['profiles']['Row']
-export type ProfileInsert = Database['public']['Tables']['profiles']['Insert']
-export type ProfileUpdate = Database['public']['Tables']['profiles']['Update']
-
-export type Vacancy = Database['public']['Tables']['vacancies']['Row']
-export type VacancyInsert = Database['public']['Tables']['vacancies']['Insert']
-export type VacancyUpdate = Database['public']['Tables']['vacancies']['Update']
-
-export type VacancyApplication = Database['public']['Tables']['vacancy_applications']['Row']
-export type VacancyApplicationInsert = Database['public']['Tables']['vacancy_applications']['Insert']
-export type VacancyApplicationUpdate = Database['public']['Tables']['vacancy_applications']['Update']
-
-export type GalleryPhoto = Database['public']['Tables']['gallery_photos']['Row']
-export type GalleryPhotoInsert = Database['public']['Tables']['gallery_photos']['Insert']
-export type GalleryPhotoUpdate = Database['public']['Tables']['gallery_photos']['Update']
-
-export type ClubMedia = Database['public']['Tables']['club_media']['Row']
-export type ClubMediaInsert = Database['public']['Tables']['club_media']['Insert']
-export type ClubMediaUpdate = Database['public']['Tables']['club_media']['Update']
-
-export type PlayingHistory = Database['public']['Tables']['playing_history']['Row']
-export type PlayingHistoryInsert = Database['public']['Tables']['playing_history']['Insert']
-export type PlayingHistoryUpdate = Database['public']['Tables']['playing_history']['Update']
-
-export type Message = Database['public']['Tables']['messages']['Row']
-export type MessageInsert = Database['public']['Tables']['messages']['Insert']
-export type MessageUpdate = Database['public']['Tables']['messages']['Update']
-
-export type Conversation = Database['public']['Tables']['conversations']['Row']
-export type ConversationInsert = Database['public']['Tables']['conversations']['Insert']
-export type ConversationUpdate = Database['public']['Tables']['conversations']['Update']
-
-// Complex joined types
-export type VacancyApplicationWithPlayer = VacancyApplication & {
-  player: Profile
-}

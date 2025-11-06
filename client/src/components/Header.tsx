@@ -25,29 +25,20 @@ export default function Header() {
       const count = await requestCache.dedupe(
         cacheKey,
         async () => {
-          // First get conversations where user is a participant
-          const { data: conversations } = await supabase
-            .from('conversations')
-            .select('id')
-            .or(`participant_one_id.eq.${user.id},participant_two_id.eq.${user.id}`)
+          // Use materialized view for instant unread count (<10ms)
+          const { data, error } = await supabase
+            .from('user_unread_counts_secure')
+            .select('unread_count')
+            .maybeSingle()
 
-          if (!conversations || conversations.length === 0) {
+          if (error) {
+            console.error('Failed to fetch unread count:', error)
             return 0
           }
 
-          const conversationIds = conversations.map(c => c.id)
-
-          // Then count unread messages in those conversations
-          const { count } = await supabase
-            .from('messages')
-            .select('*', { count: 'exact', head: true })
-            .in('conversation_id', conversationIds)
-            .neq('sender_id', user.id)
-            .is('read_at', null)
-
-          return count || 0
+          return data?.unread_count || 0
         },
-        10000 // Cache for 10 seconds
+        60000 // Cache for 60 seconds (increased from 10s)
       )
 
       setUnreadCount(count)
