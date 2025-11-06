@@ -779,8 +779,3 @@ export const Constants = {
     },
   },
 } as const
-
-// Convenience type exports
-export type Vacancy = Database['public']['Tables']['vacancies']['Row']
-export type Profile = Database['public']['Tables']['profiles']['Row']
-export type GalleryPhoto = Database['public']['Tables']['gallery_photos']['Row']

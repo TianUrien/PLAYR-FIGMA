@@ -6,6 +6,9 @@ import { ChatWindowSkeleton } from './Skeleton'
 import { monitor } from '@/lib/monitor'
 import { logger } from '@/lib/logger'
 import { withRetry } from '@/lib/retry'
+import { requestCache, generateCacheKey } from '@/lib/requestCache'
+
+type NullableDate = string | null
 
 interface Message {
   id: string
@@ -13,7 +16,15 @@ interface Message {
   sender_id: string
   content: string
   sent_at: string
-  read_at: string | null
+  read_at: NullableDate
+}
+
+interface ConversationParticipant {
+  id: string
+  full_name: string
+  username: string | null
+  avatar_url: string | null
+  role: 'player' | 'coach' | 'club'
 }
 
 interface Conversation {
@@ -22,14 +33,8 @@ interface Conversation {
   participant_two_id: string
   created_at: string
   updated_at: string
-  last_message_at: string | null
-  otherParticipant?: {
-    id: string
-    full_name: string
-    username: string | null
-    avatar_url: string | null
-    role: 'player' | 'coach' | 'club'
-  }
+  last_message_at: NullableDate
+  otherParticipant?: ConversationParticipant
   isPending?: boolean
 }
 
@@ -48,16 +53,33 @@ export default function ChatWindow({ conversation, currentUserId, onBack, onMess
   const [loading, setLoading] = useState(true)
   const messagesEndRef = useRef<HTMLDivElement>(null)
   const inputRef = useRef<HTMLTextAreaElement>(null)
+  const messagesRef = useRef<Message[]>([])
+
+  const syncMessagesState = useCallback(
+    (next: Message[] | ((prev: Message[]) => Message[])) => {
+      if (typeof next === 'function') {
+        setMessages(prev => {
+          const resolved = next(prev)
+          messagesRef.current = resolved
+          return resolved
+        })
+      } else {
+        messagesRef.current = next
+        setMessages(next)
+      }
+    },
+    []
+  )
 
   const fetchMessages = useCallback(async () => {
     if (!conversation.id || conversation.isPending) {
-      setMessages([])
+      syncMessagesState([])
       setLoading(false)
-      return
+      return [] as Message[]
     }
 
+    setLoading(true)
     try {
-      setLoading(true)
       const { data, error } = await supabase
         .from('messages')
         .select('*')
@@ -65,58 +87,125 @@ export default function ChatWindow({ conversation, currentUserId, onBack, onMess
         .order('sent_at', { ascending: true })
 
       if (error) throw error
-      logger.debug('Fetched messages:', data)
-      setMessages(data || [])
+
+      const fetched = data ?? []
+      logger.debug('Fetched messages:', fetched)
+      syncMessagesState(fetched)
+      return fetched
     } catch (error) {
       logger.error('Error fetching messages:', error)
+      syncMessagesState([])
+      return [] as Message[]
     } finally {
       setLoading(false)
     }
-  }, [conversation.id, conversation.isPending])
+  }, [conversation.id, conversation.isPending, syncMessagesState])
 
-  const markMessagesAsRead = useCallback(async () => {
-    if (!conversation.id || conversation.isPending) {
-      return
-    }
+  const markMessagesAsRead = useCallback(
+    async (messagesOverride?: Message[]) => {
+      if (!conversation.id || conversation.isPending) {
+        return
+      }
 
-    // Optimistically mark messages as read in UI immediately
-    const now = new Date().toISOString()
-    setMessages(prev => 
-      prev.map(msg => 
-        msg.sender_id !== currentUserId && !msg.read_at
-          ? { ...msg, read_at: now }
-          : msg
+      const snapshot = messagesOverride ?? messagesRef.current
+      if (!snapshot.length) {
+        logger.debug('No messages loaded yet, skipping mark-as-read')
+        return
+      }
+
+      const unreadMessages = snapshot.filter(
+        msg => msg.sender_id !== currentUserId && !msg.read_at
       )
-    )
-    
-    // Update badge count immediately
-    onMessageSent()
-    
-    // Then update in database
-    try {
-      await supabase
-        .from('messages')
-        .update({ read_at: now })
-        .eq('conversation_id', conversation.id)
-        .neq('sender_id', currentUserId)
-        .is('read_at', null)
-    } catch (error) {
-      logger.error('Error marking messages as read:', error)
-      // Silently fail - user already sees them as read
-    }
-  }, [conversation.id, conversation.isPending, currentUserId, onMessageSent])
+      const unreadCount = unreadMessages.length
+
+      if (unreadCount === 0) {
+        logger.debug('No unread messages to mark, skipping')
+        return
+      }
+
+      logger.debug(`Found ${unreadCount} unread messages to mark as read`)
+
+      if (typeof window !== 'undefined' && window.__updateUnreadBadge) {
+        window.__updateUnreadBadge(-unreadCount)
+        logger.debug(`Optimistically decremented badge by ${unreadCount}`)
+      }
+
+      const now = new Date().toISOString()
+      const applyReadState = (source: Message[]) =>
+        source.map(msg =>
+          msg.sender_id !== currentUserId && !msg.read_at
+            ? { ...msg, read_at: now }
+            : msg
+        )
+
+      if (messagesOverride) {
+        syncMessagesState(applyReadState(snapshot))
+      } else {
+        syncMessagesState(prev => applyReadState(prev))
+      }
+
+      const cacheKey = generateCacheKey('unread_count', { userId: currentUserId })
+      requestCache.invalidate(cacheKey)
+      onMessageSent()
+
+      try {
+        const { error } = await supabase
+          .from('messages')
+          .update({ read_at: now })
+          .eq('conversation_id', conversation.id)
+          .neq('sender_id', currentUserId)
+          .is('read_at', null)
+
+        if (error) throw error
+
+        logger.debug('Database confirmed messages as read', {
+          conversationId: conversation.id,
+          unreadCount
+        })
+
+        requestCache.invalidate(cacheKey)
+        if (typeof window !== 'undefined' && window.__refreshUnreadBadge) {
+          window.__refreshUnreadBadge()
+        }
+      } catch (error) {
+        logger.error('Error marking messages as read in database:', error)
+
+        if (typeof window !== 'undefined' && window.__updateUnreadBadge) {
+          window.__updateUnreadBadge(unreadCount)
+        }
+
+        syncMessagesState(messagesOverride ? snapshot : messagesRef.current)
+      }
+    },
+    [conversation.id, conversation.isPending, currentUserId, onMessageSent, syncMessagesState]
+  )
 
   useEffect(() => {
     if (!conversation.id || conversation.isPending) {
       setLoading(false)
+      syncMessagesState([])
       return
     }
 
-    fetchMessages()
-    markMessagesAsRead()
-  }, [conversation.id, conversation.isPending, fetchMessages, markMessagesAsRead])
+    let cancelled = false
 
-  // Set up real-time subscription for new messages in this conversation
+    fetchMessages().then(fetched => {
+      if (!cancelled) {
+        markMessagesAsRead(fetched)
+      }
+    })
+
+    const cacheKey = generateCacheKey('unread_count', { userId: currentUserId })
+    requestCache.invalidate(cacheKey)
+    if (typeof window !== 'undefined' && window.__refreshUnreadBadge) {
+      window.__refreshUnreadBadge()
+    }
+
+    return () => {
+      cancelled = true
+    }
+  }, [conversation.id, conversation.isPending, currentUserId, fetchMessages, markMessagesAsRead, syncMessagesState])
+
   useEffect(() => {
     if (!conversation.id || conversation.isPending) return
 
@@ -130,18 +219,17 @@ export default function ChatWindow({ conversation, currentUserId, onBack, onMess
           table: 'messages',
           filter: `conversation_id=eq.${conversation.id}`
         },
-        (payload) => {
+        payload => {
           const newMessage = payload.new as Message
-          setMessages((prev) => {
-            // Check if message already exists (avoid duplicates from optimistic updates)
+          syncMessagesState(prev => {
             if (prev.some(msg => msg.id === newMessage.id)) {
               return prev
             }
             return [...prev, newMessage]
           })
+
           if (newMessage.sender_id !== currentUserId) {
             markMessagesAsRead()
-            onMessageSent()
           }
         }
       )
@@ -153,9 +241,10 @@ export default function ChatWindow({ conversation, currentUserId, onBack, onMess
           table: 'messages',
           filter: `conversation_id=eq.${conversation.id}`
         },
-        (payload) => {
-          setMessages((prev) =>
-            prev.map((msg) => (msg.id === payload.new.id ? (payload.new as Message) : msg))
+        payload => {
+          const updated = payload.new as Message
+          syncMessagesState(prev =>
+            prev.map(msg => (msg.id === updated.id ? updated : msg))
           )
         }
       )
@@ -164,16 +253,11 @@ export default function ChatWindow({ conversation, currentUserId, onBack, onMess
     return () => {
       supabase.removeChannel(channel)
     }
-  }, [conversation.id, conversation.isPending, currentUserId, onMessageSent, markMessagesAsRead]) // Fixed: Proper dependencies
+  }, [conversation.id, conversation.isPending, currentUserId, markMessagesAsRead, syncMessagesState])
 
-  // Auto-scroll to bottom when new messages arrive
   useEffect(() => {
-    scrollToBottom()
-  }, [messages])
-
-  const scrollToBottom = () => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' })
-  }
+  }, [messages])
 
   const handleSendMessage = async (e: React.FormEvent) => {
     e.preventDefault()
@@ -213,6 +297,7 @@ export default function ChatWindow({ conversation, currentUserId, onBack, onMess
                 participant_two_id: otherParticipantId
               })
               .select()
+
             if (response.error) throw response.error
             return response
           })
@@ -256,7 +341,6 @@ export default function ChatWindow({ conversation, currentUserId, onBack, onMess
             throw creationError
           }
 
-          // Race condition: conversation already exists, reuse it instead of failing
           activeConversationId = existingConversation.id
           newlyCreatedConversation = {
             ...existingConversation,
@@ -278,7 +362,7 @@ export default function ChatWindow({ conversation, currentUserId, onBack, onMess
         read_at: null
       }
 
-      setMessages((prev) => [...prev, optimisticMessage])
+      syncMessagesState(prev => [...prev, optimisticMessage])
       setNewMessage('')
       inputRef.current?.focus()
 
@@ -307,13 +391,14 @@ export default function ChatWindow({ conversation, currentUserId, onBack, onMess
 
           if (data && data[0]) {
             logger.debug('Message sent successfully, replacing optimistic message')
-            setMessages((prev) => prev.map((msg) => (msg.id === optimisticId ? data[0] : msg)))
+            const persisted = data[0] as Message
+            syncMessagesState(prev => prev.map(msg => (msg.id === optimisticId ? persisted : msg)))
           }
         },
         { conversationId: conversationIdForMetrics }
       )
 
-      onMessageSent() // Notify parent for badge updates only
+      onMessageSent()
 
       if (newlyCreatedConversation) {
         onConversationCreated(newlyCreatedConversation)
@@ -321,7 +406,8 @@ export default function ChatWindow({ conversation, currentUserId, onBack, onMess
     } catch (error) {
       logger.error('Error sending message:', error)
       if (optimisticId) {
-        setMessages((prev) => prev.filter((msg) => msg.id !== optimisticId))
+        const finalOptimisticId = optimisticId
+        syncMessagesState(prev => prev.filter(msg => msg.id !== finalOptimisticId))
       }
       setNewMessage(messageContent)
 
@@ -361,7 +447,6 @@ export default function ChatWindow({ conversation, currentUserId, onBack, onMess
   if (loading) {
     return (
       <div className="flex flex-col h-full">
-        {/* Header Skeleton */}
         <div className="p-4 border-b border-gray-200 flex items-center gap-3 bg-white">
           <div className="w-10 h-10 bg-gray-200 rounded-full animate-pulse"></div>
           <div className="flex-1">
@@ -369,9 +454,7 @@ export default function ChatWindow({ conversation, currentUserId, onBack, onMess
             <div className="h-3 w-20 bg-gray-200 rounded animate-pulse"></div>
           </div>
         </div>
-        {/* Messages Skeleton */}
         <ChatWindowSkeleton />
-        {/* Input Skeleton */}
         <div className="p-4 border-t border-gray-200 bg-white">
           <div className="h-12 bg-gray-100 rounded-xl animate-pulse"></div>
         </div>
@@ -381,7 +464,6 @@ export default function ChatWindow({ conversation, currentUserId, onBack, onMess
 
   return (
     <div className="flex flex-col h-full">
-      {/* Header */}
       <div className="p-4 border-b border-gray-200 flex items-center gap-3 bg-white">
         <button
           onClick={onBack}
@@ -408,29 +490,25 @@ export default function ChatWindow({ conversation, currentUserId, onBack, onMess
             {conversation.otherParticipant?.full_name}
           </h2>
           <div className="flex items-center gap-2">
-            <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium ${
-              conversation.otherParticipant?.role === 'club'
-                ? 'bg-orange-50 text-orange-700'
-                : conversation.otherParticipant?.role === 'coach'
-                ? 'bg-purple-50 text-purple-700'
-                : 'bg-blue-50 text-blue-700'
-            }`}>
-              {conversation.otherParticipant?.role === 'club' 
-                ? 'Club' 
+            <span
+              className={`inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium ${
+                conversation.otherParticipant?.role === 'club'
+                  ? 'bg-orange-50 text-orange-700'
+                  : conversation.otherParticipant?.role === 'coach'
+                  ? 'bg-purple-50 text-purple-700'
+                  : 'bg-blue-50 text-blue-700'
+              }`}
+            >
+              {conversation.otherParticipant?.role === 'club'
+                ? 'Club'
                 : conversation.otherParticipant?.role === 'coach'
                 ? 'Coach'
                 : 'Player'}
             </span>
-            {/* Active status - placeholder for future feature */}
-            {/* <span className="flex items-center gap-1 text-xs text-gray-500">
-              <Circle className="w-2 h-2 fill-green-500 text-green-500" />
-              Active now
-            </span> */}
           </div>
         </div>
       </div>
 
-      {/* Messages */}
       <div className="flex-1 overflow-y-auto p-4 space-y-4 bg-gray-50">
         {messages.length === 0 ? (
           <div className="flex items-center justify-center h-full">
@@ -443,9 +521,9 @@ export default function ChatWindow({ conversation, currentUserId, onBack, onMess
             {messages.map((message, index) => {
               const isMyMessage = message.sender_id === currentUserId
               const isPending = message.id.startsWith('optimistic-')
-              const showTimestamp = 
-                index === 0 || 
-                new Date(message.sent_at).getTime() - new Date(messages[index - 1].sent_at).getTime() > 300000 // 5 minutes
+              const showTimestamp =
+                index === 0 ||
+                new Date(message.sent_at).getTime() - new Date(messages[index - 1].sent_at).getTime() > 300000
 
               return (
                 <div key={message.id}>
@@ -489,14 +567,13 @@ export default function ChatWindow({ conversation, currentUserId, onBack, onMess
         )}
       </div>
 
-      {/* Message Input */}
       <form onSubmit={handleSendMessage} className="p-4 bg-white border-t border-gray-200">
         <div className="flex items-end gap-2">
           <div className="flex-1 relative">
             <textarea
               ref={inputRef}
               value={newMessage}
-              onChange={(e) => setNewMessage(e.target.value)}
+              onChange={e => setNewMessage(e.target.value)}
               onKeyDown={handleKeyDown}
               placeholder="Type a message..."
               rows={1}

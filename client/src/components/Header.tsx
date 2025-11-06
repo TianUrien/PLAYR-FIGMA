@@ -15,35 +15,72 @@ export default function Header() {
   const [dropdownOpen, setDropdownOpen] = useState(false)
   const dropdownRef = useRef<HTMLDivElement>(null)
 
-    // Fetch unread message count
+  // Fetch unread message count
   const fetchUnreadCount = useCallback(async () => {
     if (!user?.id) return
 
     const cacheKey = generateCacheKey('unread_count', { userId: user.id })
+    console.log('🔍 [Header] Fetching unread count...', { cacheKey })
 
     await monitor.measure('fetch_unread_count', async () => {
       const count = await requestCache.dedupe(
         cacheKey,
         async () => {
-          // Use materialized view for instant unread count (<10ms)
+          console.log('📡 [Header] Querying user_unread_counts_secure view...')
+          // Use regular view for instant unread count (10-50ms with indexes)
           const { data, error } = await supabase
             .from('user_unread_counts_secure')
             .select('unread_count')
             .maybeSingle()
 
           if (error) {
-            console.error('Failed to fetch unread count:', error)
+            console.error('❌ [Header] Failed to fetch unread count:', error)
             return 0
           }
 
-          return data?.unread_count || 0
+          const unreadCount = data?.unread_count || 0
+          console.log('✅ [Header] Fetched unread count from DB:', unreadCount)
+          return unreadCount
         },
-        60000 // Cache for 60 seconds (increased from 10s)
+        5000 // 🔥 FIX #3: Reduced from 60s to 5s for faster recovery
       )
 
+      console.log('📊 [Header] Setting unread count state:', count)
       setUnreadCount(count)
     }, { userId: user.id })
   }, [user?.id]) // Only depend on user.id to prevent unnecessary recreations
+
+  // 🔥 FIX #4: Export method for optimistic badge updates
+  // This allows ChatWindow to instantly decrement the badge
+  useEffect(() => {
+    if (typeof window !== 'undefined') {
+      window.__updateUnreadBadge = (delta: number) => {
+        console.log(`🎯 [Header] __updateUnreadBadge called with delta: ${delta}`)
+        setUnreadCount(prev => {
+          const newCount = Math.max(0, prev + delta)
+          console.log(`🎯 [Header] Badge count: ${prev} → ${newCount}`)
+          return newCount
+        })
+      }
+      
+      // Add function to force refresh badge from database
+      window.__refreshUnreadBadge = () => {
+        console.log('🔄 [Header] __refreshUnreadBadge called - forcing database refresh')
+        fetchUnreadCount()
+      }
+      
+      console.log('✅ [Header] window.__updateUnreadBadge registered')
+      console.log('✅ [Header] window.__refreshUnreadBadge registered')
+    }
+    return () => {
+      if (typeof window !== 'undefined') {
+        delete window.__updateUnreadBadge
+        delete window.__refreshUnreadBadge
+        console.log('🗑️ [Header] window.__updateUnreadBadge cleaned up')
+        console.log('🗑️ [Header] window.__refreshUnreadBadge cleaned up')
+      }
+    }
+  }, [fetchUnreadCount])
 
   useEffect(() => {
     if (!user?.id) return
@@ -60,8 +97,14 @@ export default function Header() {
           schema: 'public',
           table: 'messages'
         },
-        () => {
-          fetchUnreadCount()
+        (payload) => {
+          console.log('🔔 [Header] Real-time message event:', payload.eventType)
+          // Add a small delay to ensure DB transaction is committed
+          // This prevents fetching stale data due to race conditions
+          setTimeout(() => {
+            console.log('⏰ [Header] Fetching unread count after DB sync delay')
+            fetchUnreadCount()
+          }, 250) // 250ms delay for DB sync
         }
       )
       .subscribe()
