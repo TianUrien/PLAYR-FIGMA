@@ -2,6 +2,7 @@ import { useCallback, useEffect, useId, useRef, useState } from 'react'
 import { X } from 'lucide-react'
 import { supabase } from '../lib/supabase'
 import { useAuthStore } from '../lib/auth'
+import { useToastStore } from '../lib/toast'
 import type { Vacancy } from '../lib/database.types'
 import Button from './Button'
 import { useFocusTrap } from '@/hooks/useFocusTrap'
@@ -11,6 +12,7 @@ interface ApplyToVacancyModalProps {
   onClose: () => void
   vacancy: Vacancy
   onSuccess: () => void
+  onError?: () => void
 }
 
 export default function ApplyToVacancyModal({
@@ -18,8 +20,10 @@ export default function ApplyToVacancyModal({
   onClose,
   vacancy,
   onSuccess,
+  onError,
 }: ApplyToVacancyModalProps) {
   const { user } = useAuthStore()
+  const { addToast } = useToastStore()
   const [coverLetter, setCoverLetter] = useState('')
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [error, setError] = useState<string | null>(null)
@@ -68,11 +72,16 @@ export default function ApplyToVacancyModal({
     setIsSubmitting(true)
     setError(null)
 
-    // Optimistically call onSuccess immediately for instant UI feedback
-    onSuccess() // Update UI immediately
-    onClose() // Close modal immediately
+    // ⚡ INSTANT UI UPDATE - Parent state already updated via button click
+    const startTime = performance.now()
+    onSuccess() // Confirm state update in parent
+    onClose() // Close modal
+    const uiUpdateTime = performance.now() - startTime
+    console.log(`✅ Modal closed in ${uiUpdateTime.toFixed(2)}ms`)
 
+    // STEP 2: Background database operation with rollback on error
     try {
+      // Idempotent insert: use upsert-like behavior
       const { error: insertError } = await supabase
         .from('vacancy_applications')
         .insert({
@@ -83,23 +92,28 @@ export default function ApplyToVacancyModal({
         } as never)
 
       if (insertError) {
-        // Check for duplicate application error
+        // Check for duplicate application error (code 23505 = unique violation)
         if (insertError.code === '23505') {
-          // Already applied - show message but don't revert UI
-          alert('You have already applied to this vacancy.')
+          // Idempotent success - user already applied, UI is correct
+          console.log('✅ Application already exists (idempotent)')
+          addToast('Application confirmed!', 'success')
         } else {
-          // Real error - we should ideally revert the optimistic update
-          throw insertError
+          // Real error - ROLLBACK optimistic update
+          console.error('❌ Error applying to vacancy:', insertError)
+          onError?.() // Revert UI state
+          addToast('Failed to submit application. Please try again.', 'error')
         }
-        return
+      } else {
+        // Success! Application created
+        console.log('✅ Application submitted successfully')
+        addToast('Application submitted successfully!', 'success')
+        setCoverLetter('') // Clear for next use
       }
-
-      // Success! Clear cover letter for next time
-      setCoverLetter('')
     } catch (err) {
-      console.error('Error applying to vacancy:', err)
-      // In a real app, you'd want to revert the optimistic update here
-      alert('Failed to submit application. Please try refreshing the page.')
+      // Network error or unexpected failure - ROLLBACK
+      console.error('❌ Unexpected error:', err)
+      onError?.() // Revert UI state
+      addToast('Network error. Please check your connection and try again.', 'error')
     } finally {
       setIsSubmitting(false)
     }

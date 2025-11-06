@@ -2,6 +2,7 @@ import { useEffect, useRef, lazy, Suspense } from 'react'
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom'
 import { initializeAuth } from '@/lib/auth'
 import { ProtectedRoute, ErrorBoundary, Layout } from '@/components'
+import ToastContainer from '@/components/ToastContainer'
 import Landing from '@/pages/Landing'
 import SignUp from '@/pages/SignUp'
 import AuthCallback from '@/pages/AuthCallback'
@@ -58,6 +59,7 @@ function App() {
   return (
     <ErrorBoundary>
       <BrowserRouter>
+        <ToastContainer />
         <ProtectedRoute>
           <Layout>
             <Suspense fallback={<PageLoader />}>

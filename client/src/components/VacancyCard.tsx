@@ -1,4 +1,5 @@
 import { MapPin, Calendar, Clock, Eye, Home, Car, Globe as GlobeIcon, Plane, Utensils, Briefcase, Shield, GraduationCap } from 'lucide-react'
+import { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import type { Vacancy } from '../lib/database.types'
 import { Avatar } from './index'
@@ -35,6 +36,20 @@ export default function VacancyCard({
   hasApplied = false
 }: VacancyCardProps) {
   const navigate = useNavigate()
+  
+  // Local state for instant UI feedback (optimistic UI)
+  const [isApplying, setIsApplying] = useState(false)
+  const showApplied = hasApplied || isApplying
+
+  const handleApplyClick = () => {
+    if (!onApply) return
+    
+    // ⚡ INSTANT feedback - update local state immediately
+    setIsApplying(true)
+    
+    // Then trigger the parent's apply flow
+    onApply()
+  }
 
   const handleClubClick = (e: React.MouseEvent) => {
     e.stopPropagation()
@@ -205,7 +220,7 @@ export default function VacancyCard({
 
       {/* Actions */}
       <div className="flex items-center gap-2 pt-4 border-t border-gray-200">
-        {hasApplied ? (
+        {showApplied ? (
           <Button
             disabled
             className="flex-1 bg-gray-100 text-gray-500 cursor-not-allowed"
@@ -214,10 +229,11 @@ export default function VacancyCard({
           </Button>
         ) : onApply ? (
           <Button
-            onClick={onApply}
-            className="flex-1 bg-gradient-to-r from-[#6366f1] to-[#8b5cf6] hover:opacity-90"
+            onClick={handleApplyClick}
+            disabled={isApplying}
+            className="flex-1 bg-gradient-to-r from-[#6366f1] to-[#8b5cf6] hover:opacity-90 disabled:opacity-50"
           >
-            Apply Now
+            {isApplying ? '✓ Applied' : 'Apply Now'}
           </Button>
         ) : (
           <Button

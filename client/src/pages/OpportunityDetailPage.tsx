@@ -12,7 +12,7 @@ export default function OpportunityDetailPage() {
   const navigate = useNavigate()
   const { user, profile } = useAuthStore()
   const [vacancy, setVacancy] = useState<Vacancy | null>(null)
-  const [club, setClub] = useState<{ id: string; full_name: string; avatar_url: string | null } | null>(null)
+  const [club, setClub] = useState<{ id: string; full_name: string | null; avatar_url: string | null } | null>(null)
   const [hasApplied, setHasApplied] = useState(false)
   const [showApplyModal, setShowApplyModal] = useState(false)
   const [isLoading, setIsLoading] = useState(true)
@@ -131,12 +131,12 @@ export default function OpportunityDetailPage() {
         <div className="pt-20">
           <VacancyDetailView
             vacancy={vacancy}
-            clubName={club.full_name}
+            clubName={club.full_name || 'Unknown Club'}
             clubLogo={club.avatar_url}
             clubId={club.id}
             onClose={() => navigate('/opportunities')}
             onApply={
-              user && (profile?.role === 'player' || profile?.role === 'coach')
+              user && (profile?.role === 'player' || profile?.role === 'coach') && !hasApplied
                 ? () => setShowApplyModal(true)
                 : undefined
             }
@@ -152,8 +152,15 @@ export default function OpportunityDetailPage() {
           onClose={() => setShowApplyModal(false)}
           vacancy={vacancy}
           onSuccess={() => {
+            // ⚡ OPTIMISTIC UPDATE: Instant UI feedback
+            setHasApplied(true)
+            
+            // Background sync to ensure consistency
             refreshApplicationStatus()
-            alert('Application submitted successfully!')
+          }}
+          onError={() => {
+            // 🔄 ROLLBACK: Revert optimistic update on error
+            setHasApplied(false)
           }}
         />
       )}

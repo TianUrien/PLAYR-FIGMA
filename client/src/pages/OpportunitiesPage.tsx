@@ -82,11 +82,11 @@ export default function OpportunitiesPage() {
             // Build clubs map from embedded data
             const clubsMap: Record<string, { id: string; full_name: string; avatar_url: string | null }> = {}
             
-            vacanciesData?.forEach((vacancy: Vacancy & { club?: { id: string; full_name: string; avatar_url: string | null } }) => {
+            vacanciesData?.forEach((vacancy: Vacancy & { club?: { id: string; full_name: string | null; avatar_url: string | null } }) => {
               if (vacancy.club && vacancy.club.id) {
                 clubsMap[vacancy.club.id] = {
                   id: vacancy.club.id,
-                  full_name: vacancy.club.full_name,
+                  full_name: vacancy.club.full_name || 'Unknown Club',
                   avatar_url: vacancy.club.avatar_url,
                 }
               }
@@ -522,7 +522,7 @@ export default function OpportunitiesPage() {
                         setShowDetailView(true)
                       }}
                       onApply={
-                        user && (profile?.role === 'player' || profile?.role === 'coach')
+                        user && (profile?.role === 'player' || profile?.role === 'coach') && !userApplications.has(vacancy.id)
                           ? () => {
                               setSelectedVacancy(vacancy)
                               setShowApplyModal(true)
@@ -551,7 +551,7 @@ export default function OpportunitiesPage() {
             setSelectedVacancy(null)
           }}
           onApply={
-            user && (profile?.role === 'player' || profile?.role === 'coach')
+            user && (profile?.role === 'player' || profile?.role === 'coach') && !userApplications.has(selectedVacancy.id)
               ? () => {
                   setShowDetailView(false)
                   setShowApplyModal(true)
@@ -572,10 +572,19 @@ export default function OpportunitiesPage() {
           }}
           vacancy={selectedVacancy}
           onSuccess={() => {
-            // Refresh applications list
+            // ⚡ OPTIMISTIC UPDATE: Instant UI feedback
+            setUserApplications(prev => new Set([...prev, selectedVacancy.id]))
+            
+            // Background sync to ensure consistency
             fetchUserApplications()
-            // Optionally show success message
-            alert('Application submitted successfully!')
+          }}
+          onError={() => {
+            // 🔄 ROLLBACK: Remove optimistic update on error
+            setUserApplications(prev => {
+              const next = new Set(prev)
+              next.delete(selectedVacancy.id)
+              return next
+            })
           }}
         />
       )}
