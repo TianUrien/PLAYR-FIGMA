@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback } from 'react'
-import { Plus, Edit2, Copy, Archive, MapPin, Calendar, Users, Eye, Rocket, X } from 'lucide-react'
+import { Plus, Edit2, Copy, Archive, MapPin, Calendar, Users, Eye, Rocket, X, Trash2 } from 'lucide-react'
 import { useNavigate } from 'react-router-dom'
 import { supabase } from '../lib/supabase'
 import { useAuthStore } from '../lib/auth'
@@ -9,6 +9,7 @@ import CreateVacancyModal from './CreateVacancyModal'
 import ApplyToVacancyModal from './ApplyToVacancyModal'
 import VacancyDetailView from './VacancyDetailView'
 import PublishConfirmationModal from './PublishConfirmationModal'
+import DeleteVacancyModal from './DeleteVacancyModal'
 
 interface VacanciesTabProps {
   profileId?: string
@@ -43,6 +44,10 @@ export default function VacanciesTab({ profileId, readOnly = false, triggerCreat
   const [showPublishModal, setShowPublishModal] = useState(false)
   const [vacancyToPublish, setVacancyToPublish] = useState<Vacancy | null>(null)
   const [showSuccessToast, setShowSuccessToast] = useState(false)
+  
+  // Delete confirmation modal state
+  const [showDeleteModal, setShowDeleteModal] = useState(false)
+  const [vacancyToDelete, setVacancyToDelete] = useState<Vacancy | null>(null)
 
   const fetchVacancies = useCallback(async () => {
     if (!targetUserId) return
@@ -270,6 +275,38 @@ export default function VacanciesTab({ profileId, readOnly = false, triggerCreat
     } catch (error) {
       console.error('Error publishing vacancy:', error)
       alert('Failed to publish vacancy. Please try again.')
+    } finally {
+      setActionLoading(null)
+    }
+  }
+
+  const handleDeleteClick = (vacancy: Vacancy) => {
+    setVacancyToDelete(vacancy)
+    setShowDeleteModal(true)
+  }
+
+  const handleDelete = async () => {
+    if (actionLoading || !vacancyToDelete) return
+    
+    setActionLoading(vacancyToDelete.id)
+    try {
+      // Delete the vacancy (cascade will handle applications)
+      const { error } = await supabase
+        .from('vacancies')
+        .delete()
+        .eq('id', vacancyToDelete.id)
+
+      if (error) throw error
+      
+      // Refresh vacancies list
+      await fetchVacancies()
+      
+      // Close modal
+      setShowDeleteModal(false)
+      setVacancyToDelete(null)
+    } catch (error) {
+      console.error('Error deleting vacancy:', error)
+      alert('Failed to delete vacancy. Please try again.')
     } finally {
       setActionLoading(null)
     }
@@ -521,6 +558,19 @@ export default function VacanciesTab({ profileId, readOnly = false, triggerCreat
                     </button>
                   )}
                   
+                  {/* Delete Button (for closed vacancies) */}
+                  {vacancy.status === 'closed' && (
+                    <button
+                      onClick={() => handleDeleteClick(vacancy)}
+                      disabled={actionLoading === vacancy.id}
+                      className="w-full flex items-center justify-center gap-2 px-6 py-3 text-sm font-semibold text-red-700 bg-red-50 hover:bg-red-100 border border-red-200 rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                      title="Permanently delete vacancy"
+                    >
+                      <Trash2 className="w-4 h-4" />
+                      {actionLoading === vacancy.id ? 'Deleting...' : 'Delete Permanently'}
+                    </button>
+                  )}
+                  
                   {/* Secondary Actions */}
                   <div className="flex items-center gap-2">
                     <button
@@ -618,6 +668,20 @@ export default function VacanciesTab({ profileId, readOnly = false, triggerCreat
           onConfirm={handlePublish}
           vacancyTitle={vacancyToPublish.title}
           isLoading={actionLoading === vacancyToPublish.id}
+        />
+      )}
+
+      {/* Delete Confirmation Modal */}
+      {vacancyToDelete && (
+        <DeleteVacancyModal
+          isOpen={showDeleteModal}
+          onClose={() => {
+            setShowDeleteModal(false)
+            setVacancyToDelete(null)
+          }}
+          onConfirm={handleDelete}
+          vacancyTitle={vacancyToDelete.title}
+          isLoading={actionLoading === vacancyToDelete.id}
         />
       )}
 
