@@ -1,3 +1,4 @@
+import { useState } from 'react'
 import { cn } from '@/lib/utils'
 
 interface AvatarProps {
@@ -17,19 +18,32 @@ const sizeClasses = {
 }
 
 export default function Avatar({ src, alt, initials, size = 'md', className, loading = 'lazy' }: AvatarProps) {
+  const [imageLoaded, setImageLoaded] = useState(false)
+  const [imageError, setImageError] = useState(false)
+
   return (
     <div className={cn(
       "relative rounded-full overflow-hidden bg-gradient-to-br from-[#6366f1] to-[#8b5cf6] flex items-center justify-center text-white font-semibold",
       sizeClasses[size],
       className
     )}>
-      {src ? (
-        <img 
-          src={src} 
-          alt={alt || 'Avatar'} 
-          className="w-full h-full object-cover"
-          loading={loading}
-        />
+      {src && !imageError ? (
+        <>
+          {!imageLoaded && (
+            <div className="absolute inset-0 bg-gray-200 animate-pulse" />
+          )}
+          <img 
+            src={src} 
+            alt={alt || 'Avatar'} 
+            className={cn(
+              "w-full h-full object-cover transition-opacity duration-200",
+              imageLoaded ? "opacity-100" : "opacity-0"
+            )}
+            loading={loading}
+            onLoad={() => setImageLoaded(true)}
+            onError={() => setImageError(true)}
+          />
+        </>
       ) : initials ? (
         <span>{initials}</span>
       ) : (

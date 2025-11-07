@@ -239,7 +239,7 @@ export default function VacancyCard({
         )}
         <button
           onClick={onViewDetails}
-          className="p-3 border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors"
+          className="p-3 min-w-[44px] min-h-[44px] border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors flex items-center justify-center"
           title="View details"
           aria-label={`View details for ${vacancy.title} position at ${clubName}`}
         >

@@ -86,6 +86,10 @@ export default function CreateVacancyModal({ isOpen, onClose, onSuccess, editing
       return
     }
 
+    // Lock body scroll when modal is open
+    const originalOverflow = document.body.style.overflow
+    document.body.style.overflow = 'hidden'
+
     const handleKeyDown = (event: KeyboardEvent) => {
       if (event.key === 'Escape') {
         event.preventDefault()
@@ -94,7 +98,11 @@ export default function CreateVacancyModal({ isOpen, onClose, onSuccess, editing
     }
 
     document.addEventListener('keydown', handleKeyDown)
-    return () => document.removeEventListener('keydown', handleKeyDown)
+    
+    return () => {
+      document.removeEventListener('keydown', handleKeyDown)
+      document.body.style.overflow = originalOverflow
+    }
   }, [handleClose, isOpen])
 
   if (!isOpen) return null
@@ -350,6 +358,8 @@ export default function CreateVacancyModal({ isOpen, onClose, onSuccess, editing
                   }
                   aria-invalid={errors.title ? true : undefined}
                   aria-describedby={titleErrorId}
+                  autoCapitalize="words"
+                  inputMode="text"
                 />
                 {errors.title && <p id={titleErrorId} className="mt-1 text-sm text-red-600">{errors.title}</p>}
               </div>
@@ -448,6 +458,8 @@ export default function CreateVacancyModal({ isOpen, onClose, onSuccess, editing
                       errors.location_city ? 'border-red-500' : 'border-gray-300'
                     }`}
                     placeholder="City"
+                    autoCapitalize="words"
+                    inputMode="text"
                     {...locationAccessibilityProps}
                   />
                   <label htmlFor={locationCountryFieldId} className="sr-only">
@@ -462,6 +474,8 @@ export default function CreateVacancyModal({ isOpen, onClose, onSuccess, editing
                       errors.location_country ? 'border-red-500' : 'border-gray-300'
                     }`}
                     placeholder="Country"
+                    autoCapitalize="words"
+                    inputMode="text"
                     {...locationAccessibilityProps}
                   />
                 </div>
@@ -691,6 +705,9 @@ export default function CreateVacancyModal({ isOpen, onClose, onSuccess, editing
                     onChange={(e) => handleInputChange('contact_email', e.target.value)}
                     className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#10b981] focus:border-transparent"
                     placeholder="info@elitehockeyacademy.com"
+                    inputMode="email"
+                    autoCapitalize="none"
+                    autoComplete="email"
                   />
                 </div>
 
@@ -706,6 +723,8 @@ export default function CreateVacancyModal({ isOpen, onClose, onSuccess, editing
                     onChange={(e) => handleInputChange('contact_phone', e.target.value)}
                     className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#10b981] focus:border-transparent"
                     placeholder="+31 20 123 4567"
+                    inputMode="tel"
+                    autoComplete="tel"
                   />
                 </div>
               </div>

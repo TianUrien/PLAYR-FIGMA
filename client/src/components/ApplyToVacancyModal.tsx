@@ -48,6 +48,10 @@ export default function ApplyToVacancyModal({
       return
     }
 
+    // Lock body scroll when modal is open
+    const originalOverflow = document.body.style.overflow
+    document.body.style.overflow = 'hidden'
+
     const handleKeyDown = (event: KeyboardEvent) => {
       if (event.key === 'Escape') {
         event.preventDefault()
@@ -56,7 +60,11 @@ export default function ApplyToVacancyModal({
     }
 
     document.addEventListener('keydown', handleKeyDown)
-    return () => document.removeEventListener('keydown', handleKeyDown)
+    
+    return () => {
+      document.removeEventListener('keydown', handleKeyDown)
+      document.body.style.overflow = originalOverflow
+    }
   }, [handleClose, isOpen])
 
   if (!isOpen) return null

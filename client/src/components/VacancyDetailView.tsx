@@ -1,3 +1,4 @@
+import { useEffect } from 'react'
 import { X, MapPin, Calendar, Clock, Home, Car, Globe as GlobeIcon, Plane, Utensils, Briefcase, Shield, GraduationCap, Mail, Phone, CheckCircle } from 'lucide-react'
 import { useNavigate } from 'react-router-dom'
 import type { Vacancy } from '../lib/supabase'
@@ -86,6 +87,16 @@ export default function VacancyDetailView({
     }
     return genderMap[gender] || gender
   }
+
+  // Lock body scroll when modal is open
+  useEffect(() => {
+    const originalOverflow = document.body.style.overflow
+    document.body.style.overflow = 'hidden'
+
+    return () => {
+      document.body.style.overflow = originalOverflow
+    }
+  }, [])
 
   return (
     <div className="fixed inset-0 bg-black/50 z-50 overflow-y-auto">
