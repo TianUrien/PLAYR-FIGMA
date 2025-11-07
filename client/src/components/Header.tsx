@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef, useCallback } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { Menu, X, MessageCircle, LogOut, Users, Briefcase, LayoutDashboard, Settings } from 'lucide-react'
+import { MessageCircle, LogOut, Users, Briefcase, LayoutDashboard, Settings } from 'lucide-react'
 import { Avatar, NotificationBadge } from '@/components'
 import { useAuthStore } from '@/lib/auth'
 import { supabase } from '@/lib/supabase'
@@ -10,7 +10,6 @@ import { requestCache, generateCacheKey } from '@/lib/requestCache'
 export default function Header() {
   const navigate = useNavigate()
   const { user, profile, signOut } = useAuthStore()
-  const [mobileMenuOpen, setMobileMenuOpen] = useState(false)
   const [unreadCount, setUnreadCount] = useState(0)
   const [dropdownOpen, setDropdownOpen] = useState(false)
   const dropdownRef = useRef<HTMLDivElement>(null)
@@ -285,144 +284,9 @@ export default function Header() {
             )}
           </div>
 
-          {/* Mobile Menu Button */}
-          <button
-            onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
-            className="md:hidden p-2 text-gray-600 hover:text-gray-900"
-          >
-            {mobileMenuOpen ? <X className="w-6 h-6" /> : <Menu className="w-6 h-6" />}
-          </button>
         </div>
 
-        {/* Mobile Menu */}
-        {mobileMenuOpen && (
-          <div className="md:hidden mt-4 pb-4 border-t border-gray-200 pt-4 animate-slide-in-down">
-            {user && profile ? (
-              <div className="space-y-4">
-                <div className="flex items-center gap-3 pb-4 border-b border-gray-200">
-                  <Avatar
-                    src={profile.avatar_url}
-                    initials={profile.full_name.split(' ').map(n => n[0]).join('')}
-                    size="md"
-                  />
-                  <div>
-                    <p className="font-medium text-gray-900">{profile.full_name}</p>
-                    <p className="text-sm text-gray-500 capitalize">{profile.role}</p>
-                  </div>
-                </div>
-                <button
-                  onClick={() => {
-                    navigate('/community')
-                    setMobileMenuOpen(false)
-                  }}
-                  className="w-full text-left px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50 rounded-lg"
-                >
-                  <div className="flex items-center gap-2">
-                    <Users className="w-5 h-5" />
-                    <span>Community</span>
-                  </div>
-                </button>
-                <button
-                  onClick={() => {
-                    navigate('/opportunities')
-                    setMobileMenuOpen(false)
-                  }}
-                  className="w-full text-left px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50 rounded-lg"
-                >
-                  <div className="flex items-center gap-2">
-                    <Briefcase className="w-5 h-5" />
-                    <span>Opportunities</span>
-                  </div>
-                </button>
-                <button
-                  onClick={() => {
-                    navigate('/messages')
-                    setMobileMenuOpen(false)
-                  }}
-                  className="relative w-full text-left px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50 rounded-lg"
-                >
-                  <div className="flex items-center gap-2">
-                    <MessageCircle className="w-5 h-5" />
-                    <span>Messages</span>
-                    <NotificationBadge 
-                      count={unreadCount} 
-                      className="notification-badge--inline"
-                    />
-                  </div>
-                </button>
-                <button
-                  onClick={() => {
-                    navigate('/settings')
-                    setMobileMenuOpen(false)
-                  }}
-                  className="w-full text-left px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50 rounded-lg"
-                >
-                  <div className="flex items-center gap-2">
-                    <Settings className="w-5 h-5" />
-                    <span>Settings</span>
-                  </div>
-                </button>
-                <button
-                  onClick={() => {
-                    handleSignOut()
-                    setMobileMenuOpen(false)
-                  }}
-                  className="w-full text-left px-4 py-2 text-sm font-medium text-red-600 hover:bg-red-50 rounded-lg"
-                >
-                  <div className="flex items-center gap-2">
-                    <LogOut className="w-4 h-4" />
-                    <span>Sign Out</span>
-                  </div>
-                </button>
-              </div>
-            ) : (
-              <div className="space-y-2">
-                <button
-                  onClick={() => {
-                    navigate('/community')
-                    setMobileMenuOpen(false)
-                  }}
-                  className="w-full text-left px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50 rounded-lg"
-                >
-                  <div className="flex items-center gap-2">
-                    <Users className="w-5 h-5" />
-                    <span>Community</span>
-                  </div>
-                </button>
-                <button
-                  onClick={() => {
-                    navigate('/opportunities')
-                    setMobileMenuOpen(false)
-                  }}
-                  className="w-full text-left px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50 rounded-lg"
-                >
-                  <div className="flex items-center gap-2">
-                    <Briefcase className="w-5 h-5" />
-                    <span>Opportunities</span>
-                  </div>
-                </button>
-                <button
-                  onClick={() => {
-                    navigate('/')
-                    setMobileMenuOpen(false)
-                  }}
-                  className="w-full text-left px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50 rounded-lg"
-                >
-                  Sign In
-                </button>
-                <button
-                  onClick={() => {
-                    navigate('/signup')
-                    setMobileMenuOpen(false)
-                  }}
-                  className="block w-full text-center px-4 py-2 rounded-lg bg-gradient-to-r from-[#6366f1] to-[#8b5cf6] text-white text-sm font-medium"
-                >
-                  Join PLAYR
-                </button>
-              </div>
-            )}
-          </div>
-        )}
+        {/* Mobile Menu - Hidden, navigation handled by MobileBottomNav */}
       </nav>
     </header>
   )

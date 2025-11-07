@@ -1,5 +1,6 @@
 import type { ReactNode } from 'react'
 import Footer from './Footer'
+import MobileBottomNav from './MobileBottomNav'
 
 interface LayoutProps {
   children: ReactNode
@@ -16,6 +17,9 @@ export default function Layout({ children, className = '' }: LayoutProps) {
 
       {/* Footer - always at bottom */}
       <Footer />
+
+      {/* Mobile Bottom Navigation - Instagram style */}
+      <MobileBottomNav />
     </div>
   )
 }
