@@ -301,14 +301,24 @@ export default function PlayerDashboard({ profileData, readOnly = false }: Playe
                     )}
                   </div>
 
-                  {/* Right Column */}
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-1">
-                      Passport 1
-                    </label>
-                    <p className={profile.passport_1 ? "text-gray-900" : "text-gray-500 italic"}>
-                      {profile.passport_1 || 'Not specified'}
-                    </p>
+                  <div className="md:col-span-2 space-y-6">
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-1">
+                        Passport 1
+                      </label>
+                      <p className={profile.passport_1 ? "text-gray-900" : "text-gray-500 italic"}>
+                        {profile.passport_1 || 'Not specified'}
+                      </p>
+                    </div>
+
+                    {profile.passport_2 && (
+                      <div>
+                        <label className="block text-sm font-medium text-gray-700 mb-1">
+                          Passport 2
+                        </label>
+                        <p className="text-gray-900">{profile.passport_2}</p>
+                      </div>
+                    )}
                   </div>
 
                   {/* Left Column */}
@@ -318,16 +328,6 @@ export default function PlayerDashboard({ profileData, readOnly = false }: Playe
                         Current Club
                       </label>
                       <p className="text-gray-900">{profile.current_club}</p>
-                    </div>
-                  )}
-
-                  {/* Right Column */}
-                  {profile.passport_2 && (
-                    <div>
-                      <label className="block text-sm font-medium text-gray-700 mb-1">
-                        Passport 2
-                      </label>
-                      <p className="text-gray-900">{profile.passport_2}</p>
                     </div>
                   )}
                 </div>
