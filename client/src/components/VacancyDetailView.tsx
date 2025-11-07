@@ -135,8 +135,9 @@ export default function VacancyDetailView({
                     {vacancy.opportunity_type === 'player' ? '👤 Player' : '🎓 Coach'}
                   </span>
                   {vacancy.opportunity_type === 'player' && vacancy.gender && (
-                    <span className="px-3 py-1 bg-pink-100 text-pink-700 rounded-full text-sm font-medium">
-                      ♀ {formatGender(vacancy.gender)}
+                    <span className="px-3 py-1 bg-pink-100 text-pink-700 rounded-full text-sm font-medium flex items-center gap-1">
+                      <span className="flex items-center">{vacancy.gender === 'Men' ? '♂' : '♀'}</span>
+                      <span>{formatGender(vacancy.gender)}</span>
                     </span>
                   )}
                   {vacancy.opportunity_type === 'player' && vacancy.position && (
