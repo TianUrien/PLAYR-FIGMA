@@ -105,14 +105,14 @@ export default function VacancyDetailView({
           {/* Close Button */}
           <button
             onClick={onClose}
-            className="absolute top-6 right-6 p-2 hover:bg-gray-100 rounded-full transition-colors z-10"
+            className="absolute top-4 right-4 sm:top-6 sm:right-6 p-2 min-w-[44px] min-h-[44px] hover:bg-gray-100 rounded-full transition-colors z-10 flex items-center justify-center"
             aria-label="Close"
           >
             <X className="w-6 h-6 text-gray-600" />
           </button>
 
           {/* Content */}
-          <div className="p-8">
+          <div className="p-6 sm:p-8">
             {/* Header Section */}
             <div className="flex items-start gap-4 mb-6">
               <button
@@ -140,31 +140,31 @@ export default function VacancyDetailView({
 
                 {/* Badges */}
                 <div className="flex flex-wrap gap-2 mb-4">
-                  <span className={`px-3 py-1 rounded-full text-sm font-medium ${
+                  <span className={`inline-flex items-center px-3 py-1.5 rounded-full text-sm font-medium ${
                     vacancy.opportunity_type === 'player' ? 'bg-blue-100 text-blue-700' : 'bg-purple-100 text-purple-700'
                   }`}>
                     {vacancy.opportunity_type === 'player' ? '👤 Player' : '🎓 Coach'}
                   </span>
                   {vacancy.opportunity_type === 'player' && vacancy.gender && (
-                    <span className="px-3 py-1 bg-pink-100 text-pink-700 rounded-full text-sm font-medium flex items-center gap-1">
-                      <span className="flex items-center">{vacancy.gender === 'Men' ? '♂' : '♀'}</span>
-                      <span>{formatGender(vacancy.gender)}</span>
+                    <span className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-pink-100 text-pink-700 rounded-full text-sm font-medium">
+                      <span className="text-base leading-none">{vacancy.gender === 'Men' ? '♂' : '♀'}</span>
+                      <span className="leading-none">{formatGender(vacancy.gender)}</span>
                     </span>
                   )}
                   {vacancy.opportunity_type === 'player' && vacancy.position && (
-                    <span className="px-3 py-1 bg-gray-100 text-gray-700 rounded-full text-sm font-medium capitalize">
+                    <span className="inline-flex items-center px-3 py-1.5 bg-gray-100 text-gray-700 rounded-full text-sm font-medium capitalize">
                       {vacancy.position}
                     </span>
                   )}
                   {vacancy.priority && (
-                    <span className={`px-3 py-1 rounded-full text-sm font-medium ${getPriorityColor(vacancy.priority)}`}>
-                      {vacancy.priority === 'high' ? '🔥' : ''} {getPriorityLabel(vacancy.priority)}
+                    <span className={`inline-flex items-center px-3 py-1.5 rounded-full text-sm font-medium ${getPriorityColor(vacancy.priority)}`}>
+                      {vacancy.priority === 'high' ? <span className="mr-1">🔥</span> : null} {getPriorityLabel(vacancy.priority)}
                     </span>
                   )}
                   {hasApplied && (
-                    <span className="px-3 py-1 bg-green-100 text-green-700 rounded-full text-sm font-medium flex items-center gap-1">
+                    <span className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-green-100 text-green-700 rounded-full text-sm font-medium">
                       <CheckCircle className="w-4 h-4" />
-                      Applied
+                      <span className="leading-none">Applied</span>
                     </span>
                   )}
                 </div>

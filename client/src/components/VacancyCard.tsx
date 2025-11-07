@@ -94,12 +94,12 @@ export default function VacancyCard({
   const additionalBenefitsCount = Math.max(0, (vacancy.benefits?.length || 0) - 4)
 
   return (
-    <div className="bg-white border border-gray-200 rounded-xl p-6 hover:shadow-lg transition-shadow relative group">
+    <div className="bg-white border border-gray-200 rounded-xl p-5 sm:p-6 hover:shadow-lg transition-shadow relative group">
       {/* Club Header */}
       <div className="flex items-start justify-between mb-4">
         <button
           onClick={handleClubClick}
-          className="flex items-center gap-3 hover:opacity-80 transition-opacity cursor-pointer"
+          className="flex items-center gap-3 hover:opacity-80 transition-opacity cursor-pointer min-h-[44px]"
         >
           <Avatar
             src={clubLogo}
@@ -115,23 +115,24 @@ export default function VacancyCard({
       </div>
 
       {/* Badges */}
-      <div className="flex items-center gap-2 mb-3">
-        <span className={`px-3 py-1 rounded-full text-xs font-medium ${
+      <div className="flex items-center flex-wrap gap-2 mb-3">
+        <span className={`inline-flex items-center px-3 py-1.5 rounded-full text-xs font-medium ${
           vacancy.opportunity_type === 'player' ? 'bg-blue-100 text-blue-700' : 'bg-purple-100 text-purple-700'
         }`}>
           {vacancy.opportunity_type === 'player' ? 'Player' : 'Coach'}
         </span>
         {vacancy.opportunity_type === 'player' && vacancy.gender && (
-          <span className={`px-3 py-1 rounded-full text-xs font-medium flex items-center gap-1 ${
+          <span className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-medium ${
             vacancy.gender === 'Men' ? 'bg-blue-50 text-blue-700' : 'bg-pink-50 text-pink-700'
           }`}>
-            <span className="flex items-center">{vacancy.gender === 'Men' ? '♂' : '♀'}</span>
-            <span>{vacancy.gender === 'Men' ? 'Men' : 'Women'}</span>
+            <span className="text-sm leading-none">{vacancy.gender === 'Men' ? '♂' : '♀'}</span>
+            <span className="leading-none">{vacancy.gender === 'Men' ? 'Men' : 'Women'}</span>
           </span>
         )}
         {vacancy.priority === 'high' && (
-          <span className={`px-3 py-1 rounded-full text-xs font-medium ${getPriorityColor(vacancy.priority)}`}>
-            ⚠️ {getPriorityLabel(vacancy.priority)}
+          <span className={`inline-flex items-center px-3 py-1.5 rounded-full text-xs font-medium ${getPriorityColor(vacancy.priority)}`}>
+            <span className="mr-1">⚠️</span>
+            {getPriorityLabel(vacancy.priority)}
           </span>
         )}
       </div>
