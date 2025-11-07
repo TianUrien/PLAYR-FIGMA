@@ -338,12 +338,12 @@ export type Database = {
           custom_benefits: string[] | null
           description: string | null
           duration_text: string | null
-          gender: Database["public"]["Enums"]["vacancy_gender"]
+          gender: Database["public"]["Enums"]["vacancy_gender"] | null
           id: string
           location_city: string
           location_country: string
           opportunity_type: Database["public"]["Enums"]["opportunity_type"]
-          position: Database["public"]["Enums"]["vacancy_position"]
+          position: Database["public"]["Enums"]["vacancy_position"] | null
           priority: Database["public"]["Enums"]["vacancy_priority"] | null
           published_at: string | null
           requirements: string[] | null
@@ -364,12 +364,12 @@ export type Database = {
           custom_benefits?: string[] | null
           description?: string | null
           duration_text?: string | null
-          gender: Database["public"]["Enums"]["vacancy_gender"]
+          gender?: Database["public"]["Enums"]["vacancy_gender"] | null
           id?: string
           location_city: string
           location_country: string
           opportunity_type?: Database["public"]["Enums"]["opportunity_type"]
-          position: Database["public"]["Enums"]["vacancy_position"]
+          position?: Database["public"]["Enums"]["vacancy_position"] | null
           priority?: Database["public"]["Enums"]["vacancy_priority"] | null
           published_at?: string | null
           requirements?: string[] | null
@@ -390,12 +390,12 @@ export type Database = {
           custom_benefits?: string[] | null
           description?: string | null
           duration_text?: string | null
-          gender?: Database["public"]["Enums"]["vacancy_gender"]
+          gender?: Database["public"]["Enums"]["vacancy_gender"] | null
           id?: string
           location_city?: string
           location_country?: string
           opportunity_type?: Database["public"]["Enums"]["opportunity_type"]
-          position?: Database["public"]["Enums"]["vacancy_position"]
+          position?: Database["public"]["Enums"]["vacancy_position"] | null
           priority?: Database["public"]["Enums"]["vacancy_priority"] | null
           published_at?: string | null
           requirements?: string[] | null

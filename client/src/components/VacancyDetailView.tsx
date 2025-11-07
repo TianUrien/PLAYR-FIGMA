@@ -1,6 +1,6 @@
 import { X, MapPin, Calendar, Clock, Home, Car, Globe as GlobeIcon, Plane, Utensils, Briefcase, Shield, GraduationCap, Mail, Phone, CheckCircle } from 'lucide-react'
 import { useNavigate } from 'react-router-dom'
-import type { Vacancy } from '../lib/database.types'
+import type { Vacancy } from '../lib/supabase'
 import { Avatar } from './index'
 import Button from './Button'
 
@@ -129,13 +129,17 @@ export default function VacancyDetailView({
 
                 {/* Badges */}
                 <div className="flex flex-wrap gap-2 mb-4">
-                  <span className="px-3 py-1 bg-purple-100 text-purple-700 rounded-full text-sm font-medium">
+                  <span className={`px-3 py-1 rounded-full text-sm font-medium ${
+                    vacancy.opportunity_type === 'player' ? 'bg-blue-100 text-blue-700' : 'bg-purple-100 text-purple-700'
+                  }`}>
                     {vacancy.opportunity_type === 'player' ? '👤 Player' : '🎓 Coach'}
                   </span>
-                  <span className="px-3 py-1 bg-pink-100 text-pink-700 rounded-full text-sm font-medium">
-                    ♀ {formatGender(vacancy.gender)}
-                  </span>
-                  {vacancy.position && (
+                  {vacancy.opportunity_type === 'player' && vacancy.gender && (
+                    <span className="px-3 py-1 bg-pink-100 text-pink-700 rounded-full text-sm font-medium">
+                      ♀ {formatGender(vacancy.gender)}
+                    </span>
+                  )}
+                  {vacancy.opportunity_type === 'player' && vacancy.position && (
                     <span className="px-3 py-1 bg-gray-100 text-gray-700 rounded-full text-sm font-medium capitalize">
                       {vacancy.position}
                     </span>

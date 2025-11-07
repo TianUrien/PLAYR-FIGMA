@@ -2,7 +2,7 @@ import { useCallback, useEffect, useId, useRef, useState } from 'react'
 import { X, Plus, Home, Car, Globe as GlobeIcon, Plane, Utensils, Briefcase, Shield, GraduationCap, CreditCard, Trophy } from 'lucide-react'
 import { supabase } from '../lib/supabase'
 import { useAuthStore } from '../lib/auth'
-import type { Vacancy, VacancyInsert } from '../lib/database.types'
+import type { Vacancy, VacancyInsert } from '../lib/supabase'
 import Button from './Button'
 import { useFocusTrap } from '@/hooks/useFocusTrap'
 
@@ -143,8 +143,11 @@ export default function CreateVacancyModal({ isOpen, onClose, onSuccess, editing
     const newErrors: Record<string, string> = {}
 
     if (!formData.title?.trim()) newErrors.title = 'Title is required'
-    if (!formData.position) newErrors.position = 'Position is required'
-    if (!formData.gender) newErrors.gender = 'Gender is required'
+    // Only validate position and gender for player opportunities
+    if (formData.opportunity_type === 'player') {
+      if (!formData.position) newErrors.position = 'Position is required'
+      if (!formData.gender) newErrors.gender = 'Gender is required'
+    }
     if (!formData.location_city?.trim()) newErrors.location_city = 'City is required'
     if (!formData.location_country?.trim()) newErrors.location_country = 'Country is required'
 
@@ -157,12 +160,13 @@ export default function CreateVacancyModal({ isOpen, onClose, onSuccess, editing
 
     setIsLoading(true)
     try {
-      const vacancyData: VacancyInsert = {
+      const vacancyData: Partial<VacancyInsert> = {
         club_id: user.id,
         opportunity_type: formData.opportunity_type || 'player',
         title: formData.title!,
-        position: formData.position!,
-        gender: formData.gender!,
+        // Only include position and gender for player opportunities
+        position: formData.opportunity_type === 'player' ? formData.position! : undefined,
+        gender: formData.opportunity_type === 'player' ? formData.gender! : undefined,
         description: formData.description || null,
         location_city: formData.location_city!,
         location_country: formData.location_country!,
@@ -236,7 +240,12 @@ export default function CreateVacancyModal({ isOpen, onClose, onSuccess, editing
                 {editingVacancy ? 'Edit Opportunity' : 'Create New Opportunity'}
               </h2>
               <p id={subtitleId} className="text-sm text-gray-600">
-                {editingVacancy ? 'Update your opportunity details' : `Create a new ${formData.opportunity_type} opportunity for your club`}
+                {editingVacancy 
+                  ? 'Update your opportunity details' 
+                  : formData.opportunity_type === 'player'
+                    ? 'Create a new player position opportunity'
+                    : 'Create a new coaching position opportunity'
+                }
               </p>
             </div>
           </div>
@@ -312,14 +321,20 @@ export default function CreateVacancyModal({ isOpen, onClose, onSuccess, editing
                   className={`w-full px-4 py-3 border rounded-lg focus:ring-2 focus:ring-[#10b981] focus:border-transparent ${
                     errors.title ? 'border-red-500' : 'border-gray-300'
                   }`}
-                  placeholder="e.g., Elite Youth Player Opportunity"
+                  placeholder={
+                    formData.opportunity_type === 'player' 
+                      ? "e.g., Elite Youth Player Opportunity"
+                      : "e.g., Head Coach - Youth Development"
+                  }
                   aria-invalid={errors.title ? 'true' : undefined}
                   aria-describedby={titleErrorId}
                 />
                 {errors.title && <p id={titleErrorId} className="mt-1 text-sm text-red-600">{errors.title}</p>}
               </div>
 
-              <div className="grid grid-cols-2 gap-4">
+              {/* Position and Gender - Only show for player opportunities */}
+              {formData.opportunity_type === 'player' && (
+              <div className="grid grid-cols-2 gap-4 animate-in fade-in duration-200">
                 {/* Position */}
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-2">
@@ -362,6 +377,7 @@ export default function CreateVacancyModal({ isOpen, onClose, onSuccess, editing
                   {errors.gender && <p className="mt-1 text-sm text-red-600">{errors.gender}</p>}
                 </div>
               </div>
+              )}
 
               {/* Description */}
               <div>
@@ -374,7 +390,11 @@ export default function CreateVacancyModal({ isOpen, onClose, onSuccess, editing
                   onChange={(e) => handleInputChange('description', e.target.value)}
                   rows={4}
                   className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#10b981] focus:border-transparent resize-none"
-                  placeholder="Provide a detailed description of the opportunity..."
+                  placeholder={
+                    formData.opportunity_type === 'player'
+                      ? "Describe the player opportunity, training environment, and development pathway..."
+                      : "Describe the coaching role, responsibilities, and team environment..."
+                  }
                 />
               </div>
             </div>
@@ -480,7 +500,12 @@ export default function CreateVacancyModal({ isOpen, onClose, onSuccess, editing
               ))}
               
               {(!formData.requirements || formData.requirements.length === 0) && (
-                <p className="text-sm text-gray-500 italic py-2">e.g., Minimum 3 years competitive experience</p>
+                <p className="text-sm text-gray-500 italic py-2">
+                  {formData.opportunity_type === 'player'
+                    ? "e.g., Minimum 3 years competitive experience, U18 age group"
+                    : "e.g., UEFA B coaching license, 5+ years coaching experience"
+                  }
+                </p>
               )}
 
               <div className="flex gap-2">

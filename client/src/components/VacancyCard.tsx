@@ -1,7 +1,7 @@
 import { MapPin, Calendar, Clock, Eye, Home, Car, Globe as GlobeIcon, Plane, Utensils, Briefcase, Shield, GraduationCap } from 'lucide-react'
 import { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
-import type { Vacancy } from '../lib/database.types'
+import type { Vacancy } from '../lib/supabase'
 import { Avatar } from './index'
 import Button from './Button'
 
@@ -127,15 +127,17 @@ export default function VacancyCard({
       {/* Badges */}
       <div className="flex items-center gap-2 mb-3">
         <span className={`px-3 py-1 rounded-full text-xs font-medium ${
-          vacancy.opportunity_type === 'player' ? 'bg-blue-100 text-blue-700' : 'bg-green-100 text-green-700'
+          vacancy.opportunity_type === 'player' ? 'bg-blue-100 text-blue-700' : 'bg-purple-100 text-purple-700'
         }`}>
           {vacancy.opportunity_type === 'player' ? 'Player' : 'Coach'}
         </span>
-        <span className={`px-3 py-1 rounded-full text-xs font-medium ${
-          vacancy.gender === 'Men' ? 'bg-blue-50 text-blue-700' : 'bg-pink-50 text-pink-700'
-        }`}>
-          {vacancy.gender === 'Men' ? '♂ Men' : '♀ Women'}
-        </span>
+        {vacancy.opportunity_type === 'player' && vacancy.gender && (
+          <span className={`px-3 py-1 rounded-full text-xs font-medium ${
+            vacancy.gender === 'Men' ? 'bg-blue-50 text-blue-700' : 'bg-pink-50 text-pink-700'
+          }`}>
+            {vacancy.gender === 'Men' ? '♂ Men' : '♀ Women'}
+          </span>
+        )}
         {vacancy.priority === 'high' && (
           <span className={`px-3 py-1 rounded-full text-xs font-medium ${getPriorityColor(vacancy.priority)}`}>
             ⚠️ {getPriorityLabel(vacancy.priority)}
@@ -148,12 +150,14 @@ export default function VacancyCard({
         {vacancy.title}
       </h2>
 
-      {/* Position */}
-      <div className="mb-4">
-        <span className="inline-block px-3 py-1 bg-gray-100 text-gray-700 rounded-lg text-sm font-medium">
-          {vacancy.position.charAt(0).toUpperCase() + vacancy.position.slice(1)}
-        </span>
-      </div>
+      {/* Position - Only show for player opportunities */}
+      {vacancy.opportunity_type === 'player' && vacancy.position && (
+        <div className="mb-4">
+          <span className="inline-block px-3 py-1 bg-gray-100 text-gray-700 rounded-lg text-sm font-medium">
+            {vacancy.position.charAt(0).toUpperCase() + vacancy.position.slice(1)}
+          </span>
+        </div>
+      )}
 
       {/* Location & League */}
       <div className="space-y-2 mb-4">
