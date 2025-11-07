@@ -1,13 +1,14 @@
 import { useState, useEffect, useCallback } from 'react'
-import { Plus, Edit2, Copy, Archive, MapPin, Calendar, Users, Eye } from 'lucide-react'
+import { Plus, Edit2, Copy, Archive, MapPin, Calendar, Users, Eye, Rocket, X } from 'lucide-react'
 import { useNavigate } from 'react-router-dom'
 import { supabase } from '../lib/supabase'
 import { useAuthStore } from '../lib/auth'
-import type { Vacancy } from '../lib/database.types'
+import type { Vacancy } from '../lib/supabase'
 import Button from './Button'
 import CreateVacancyModal from './CreateVacancyModal'
 import ApplyToVacancyModal from './ApplyToVacancyModal'
 import VacancyDetailView from './VacancyDetailView'
+import PublishConfirmationModal from './PublishConfirmationModal'
 
 interface VacanciesTabProps {
   profileId?: string
@@ -37,6 +38,11 @@ export default function VacanciesTab({ profileId, readOnly = false, triggerCreat
   const [detailVacancy, setDetailVacancy] = useState<Vacancy | null>(null)
   const [clubName, setClubName] = useState<string>('')
   const [clubLogo, setClubLogo] = useState<string | null>(null)
+  
+  // Publish confirmation modal state
+  const [showPublishModal, setShowPublishModal] = useState(false)
+  const [vacancyToPublish, setVacancyToPublish] = useState<Vacancy | null>(null)
+  const [showSuccessToast, setShowSuccessToast] = useState(false)
 
   const fetchVacancies = useCallback(async () => {
     if (!targetUserId) return
@@ -233,19 +239,34 @@ export default function VacanciesTab({ profileId, readOnly = false, triggerCreat
     }
   }
 
-  const handlePublish = async (vacancyId: string) => {
-    if (actionLoading) return
+  const handlePublishClick = (vacancy: Vacancy) => {
+    setVacancyToPublish(vacancy)
+    setShowPublishModal(true)
+  }
+
+  const handlePublish = async () => {
+    if (actionLoading || !vacancyToPublish) return
     
-    setActionLoading(vacancyId)
+    setActionLoading(vacancyToPublish.id)
     try {
       const { error } = await supabase
         .from('vacancies')
-        .update({ status: 'open' } as never)
-        .eq('id', vacancyId)
+        .update({ status: 'open', published_at: new Date().toISOString() } as never)
+        .eq('id', vacancyToPublish.id)
 
       if (error) throw error
       
       await fetchVacancies()
+      
+      // Close modal and show success toast
+      setShowPublishModal(false)
+      setVacancyToPublish(null)
+      setShowSuccessToast(true)
+      
+      // Auto-hide toast after 3 seconds
+      setTimeout(() => {
+        setShowSuccessToast(false)
+      }, 3000)
     } catch (error) {
       console.error('Error publishing vacancy:', error)
       alert('Failed to publish vacancy. Please try again.')
@@ -257,15 +278,21 @@ export default function VacanciesTab({ profileId, readOnly = false, triggerCreat
   const getStatusBadge = (status: Vacancy['status']) => {
     if (!status) return null
     
-    const styles = {
-      draft: 'bg-gray-100 text-gray-700',
-      open: 'bg-green-100 text-green-700',
-      closed: 'bg-red-100 text-red-700',
+    const styles: Record<string, string> = {
+      draft: 'bg-amber-100 text-amber-700 border border-amber-300',
+      open: 'bg-green-100 text-green-700 border border-green-300',
+      closed: 'bg-red-100 text-red-700 border border-red-300',
+    }
+    
+    const labels: Record<string, string> = {
+      draft: '⚠️ Draft',
+      open: '✓ Published',
+      closed: 'Closed',
     }
     
     return (
-      <span className={`px-3 py-1 rounded-full text-xs font-medium ${styles[status]}`}>
-        {status.charAt(0).toUpperCase() + status.slice(1)}
+      <span className={`px-3 py-1 rounded-full text-xs font-bold ${styles[status]}`}>
+        {labels[status]}
       </span>
     )
   }
@@ -392,6 +419,15 @@ export default function VacanciesTab({ profileId, readOnly = false, triggerCreat
                 </button>
               )}
 
+              {/* Draft Warning Message */}
+              {!readOnly && vacancy.status === 'draft' && (
+                <div className="bg-amber-50 border border-amber-200 rounded-lg p-3 mb-4">
+                  <p className="text-xs text-amber-800 font-medium">
+                    ⚠️ This opportunity is <strong>not visible to players</strong>. Click "Publish" to make it live.
+                  </p>
+                </div>
+              )}
+
               {/* Apply Button - Public View */}
               {readOnly && vacancy.status === 'open' && (
                 <div className="pt-4 border-t border-gray-200">
@@ -444,47 +480,55 @@ export default function VacanciesTab({ profileId, readOnly = false, triggerCreat
 
               {/* Actions */}
               {!readOnly && (
-                <div className="flex items-center gap-2 pt-4 border-t border-gray-200">
-                <button
-                  onClick={() => handleEdit(vacancy)}
-                  disabled={actionLoading === vacancy.id}
-                  className="flex-1 flex items-center justify-center gap-2 px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50 rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
-                  title="Edit vacancy"
-                >
-                  <Edit2 className="w-4 h-4" />
-                  Edit
-                </button>
-                <button
-                  onClick={() => handleDuplicate(vacancy)}
-                  disabled={actionLoading === vacancy.id}
-                  className="flex-1 flex items-center justify-center gap-2 px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50 rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
-                  title="Duplicate vacancy"
-                >
-                  <Copy className="w-4 h-4" />
-                  {actionLoading === vacancy.id ? 'Duplicating...' : 'Duplicate'}
-                </button>
-                {vacancy.status === 'draft' && (
-                  <button
-                    onClick={() => handlePublish(vacancy.id)}
-                    disabled={actionLoading === vacancy.id}
-                    className="flex-1 flex items-center justify-center gap-2 px-4 py-2 text-sm font-medium text-green-700 hover:bg-green-50 rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
-                    title="Publish vacancy"
-                  >
-                    {actionLoading === vacancy.id ? 'Publishing...' : 'Publish'}
-                  </button>
-                )}
-                {vacancy.status === 'open' && (
-                  <button
-                    onClick={() => handleClose(vacancy.id)}
-                    disabled={actionLoading === vacancy.id}
-                    className="flex-1 flex items-center justify-center gap-2 px-4 py-2 text-sm font-medium text-red-700 hover:bg-red-50 rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
-                    title="Close vacancy"
-                  >
-                    <Archive className="w-4 h-4" />
-                    {actionLoading === vacancy.id ? 'Closing...' : 'Close'}
-                  </button>
-                )}
-              </div>
+                <div className="space-y-3 pt-4 border-t border-gray-200">
+                  {/* Primary Action: Publish Button (for drafts) */}
+                  {vacancy.status === 'draft' && (
+                    <button
+                      onClick={() => handlePublishClick(vacancy)}
+                      disabled={actionLoading === vacancy.id}
+                      className="w-full flex items-center justify-center gap-2 px-6 py-3.5 text-sm font-bold text-white bg-gradient-to-r from-green-500 to-green-600 hover:from-green-600 hover:to-green-700 rounded-lg shadow-lg shadow-green-500/30 hover:shadow-xl hover:shadow-green-500/40 transition-all disabled:opacity-50 disabled:cursor-not-allowed transform hover:scale-[1.02]"
+                      title="Publish this opportunity to make it visible to all players"
+                    >
+                      <Rocket className="w-5 h-5" />
+                      {actionLoading === vacancy.id ? 'Publishing...' : 'Publish Opportunity'}
+                    </button>
+                  )}
+                  
+                  {/* Close Button (for published) */}
+                  {vacancy.status === 'open' && (
+                    <button
+                      onClick={() => handleClose(vacancy.id)}
+                      disabled={actionLoading === vacancy.id}
+                      className="w-full flex items-center justify-center gap-2 px-6 py-3 text-sm font-semibold text-red-700 bg-red-50 hover:bg-red-100 border border-red-200 rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                      title="Close vacancy"
+                    >
+                      <Archive className="w-4 h-4" />
+                      {actionLoading === vacancy.id ? 'Closing...' : 'Close Opportunity'}
+                    </button>
+                  )}
+                  
+                  {/* Secondary Actions */}
+                  <div className="flex items-center gap-2">
+                    <button
+                      onClick={() => handleEdit(vacancy)}
+                      disabled={actionLoading === vacancy.id}
+                      className="flex-1 flex items-center justify-center gap-2 px-4 py-2.5 text-sm font-medium text-gray-700 bg-white border border-gray-300 hover:bg-gray-50 hover:border-gray-400 rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                      title="Edit vacancy"
+                    >
+                      <Edit2 className="w-4 h-4" />
+                      Edit
+                    </button>
+                    <button
+                      onClick={() => handleDuplicate(vacancy)}
+                      disabled={actionLoading === vacancy.id}
+                      className="flex-1 flex items-center justify-center gap-2 px-4 py-2.5 text-sm font-medium text-gray-700 bg-white border border-gray-300 hover:bg-gray-50 hover:border-gray-400 rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                      title="Duplicate vacancy"
+                    >
+                      <Copy className="w-4 h-4" />
+                      {actionLoading === vacancy.id && vacancy.status !== 'draft' ? 'Duplicating...' : 'Duplicate'}
+                    </button>
+                  </div>
+                </div>
               )}
             </div>
           ))}
@@ -541,6 +585,44 @@ export default function VacanciesTab({ profileId, readOnly = false, triggerCreat
           hasApplied={userApplications.has(detailVacancy.id)}
           hideClubProfileButton={true}
         />
+      )}
+
+      {/* Publish Confirmation Modal */}
+      {vacancyToPublish && (
+        <PublishConfirmationModal
+          isOpen={showPublishModal}
+          onClose={() => {
+            setShowPublishModal(false)
+            setVacancyToPublish(null)
+          }}
+          onConfirm={handlePublish}
+          vacancyTitle={vacancyToPublish.title}
+          isLoading={actionLoading === vacancyToPublish.id}
+        />
+      )}
+
+      {/* Success Toast */}
+      {showSuccessToast && (
+        <div className="fixed bottom-6 right-6 z-50 animate-slide-up">
+          <div className="bg-white rounded-lg shadow-2xl border border-green-200 p-4 flex items-center gap-3 min-w-[300px]">
+            <div className="w-10 h-10 bg-green-100 rounded-full flex items-center justify-center flex-shrink-0">
+              <svg className="w-6 h-6 text-green-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+              </svg>
+            </div>
+            <div className="flex-1">
+              <p className="font-semibold text-gray-900">Published Successfully!</p>
+              <p className="text-sm text-gray-600">Your opportunity is now visible to all players</p>
+            </div>
+            <button
+              onClick={() => setShowSuccessToast(false)}
+              className="p-1 hover:bg-gray-100 rounded-lg transition-colors"
+              aria-label="Dismiss"
+            >
+              <X className="w-4 h-4 text-gray-500" />
+            </button>
+          </div>
+        </div>
       )}
     </div>
   )
