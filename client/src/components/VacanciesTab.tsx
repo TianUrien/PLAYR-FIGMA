@@ -380,16 +380,17 @@ export default function VacanciesTab({ profileId, readOnly = false, triggerCreat
                     {getStatusBadge(vacancy.status)}
                   </div>
                   {vacancy.opportunity_type === 'player' && (
-                    <div className="flex items-center gap-4 text-sm text-gray-600">
+                    <div className="flex items-center gap-3 text-sm text-gray-600">
+                      <span className="px-2 py-1 bg-blue-100 text-blue-700 rounded text-xs font-medium">
+                        Player Position
+                      </span>
                       {vacancy.position && (
-                        <>
-                          <span className="flex items-center gap-1">
-                            <Users className="w-4 h-4" />
-                            {vacancy.position.charAt(0).toUpperCase() + vacancy.position.slice(1)}
-                          </span>
-                          <span>•</span>
-                        </>
+                        <span className="flex items-center gap-1">
+                          <Users className="w-4 h-4" />
+                          {vacancy.position.charAt(0).toUpperCase() + vacancy.position.slice(1)}
+                        </span>
                       )}
+                      {vacancy.gender && vacancy.position && <span>•</span>}
                       {vacancy.gender && <span>{vacancy.gender}</span>}
                     </div>
                   )}

@@ -100,13 +100,35 @@ export default function CreateVacancyModal({ isOpen, onClose, onSuccess, editing
   if (!isOpen) return null
 
   const handleInputChange = (field: keyof VacancyInsert, value: VacancyInsert[typeof field]) => {
-    setFormData(prev => ({ ...prev, [field]: value }))
-    // Clear error for this field
-    if (errors[field]) {
-      const newErrors = { ...errors }
-      delete newErrors[field]
-      setErrors(newErrors)
-    }
+    setFormData(prev => {
+      const next = { ...prev, [field]: value }
+      if (field === 'opportunity_type' && value === 'coach') {
+        next.position = undefined
+        next.gender = undefined
+      }
+      return next
+    })
+
+    setErrors(prevErrors => {
+      if (field === 'opportunity_type' && value === 'coach') {
+        if (!prevErrors.position && !prevErrors.gender && !prevErrors[field]) {
+          return prevErrors
+        }
+        const updated = { ...prevErrors }
+        delete updated.position
+        delete updated.gender
+        delete updated[field]
+        return updated
+      }
+
+      if (prevErrors[field]) {
+        const updated = { ...prevErrors }
+        delete updated[field]
+        return updated
+      }
+
+      return prevErrors
+    })
   }
 
   const toggleBenefit = (benefitId: string) => {
@@ -165,8 +187,8 @@ export default function CreateVacancyModal({ isOpen, onClose, onSuccess, editing
         opportunity_type: formData.opportunity_type || 'player',
         title: formData.title!,
         // Only include position and gender for player opportunities
-        position: formData.opportunity_type === 'player' ? formData.position! : undefined,
-        gender: formData.opportunity_type === 'player' ? formData.gender! : undefined,
+        position: formData.opportunity_type === 'player' ? formData.position! : null,
+        gender: formData.opportunity_type === 'player' ? formData.gender! : null,
         description: formData.description || null,
         location_city: formData.location_city!,
         location_country: formData.location_country!,
@@ -326,7 +348,7 @@ export default function CreateVacancyModal({ isOpen, onClose, onSuccess, editing
                       ? "e.g., Elite Youth Player Opportunity"
                       : "e.g., Head Coach - Youth Development"
                   }
-                  aria-invalid={errors.title ? 'true' : undefined}
+                  aria-invalid={errors.title ? true : undefined}
                   aria-describedby={titleErrorId}
                 />
                 {errors.title && <p id={titleErrorId} className="mt-1 text-sm text-red-600">{errors.title}</p>}

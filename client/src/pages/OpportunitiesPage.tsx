@@ -214,7 +214,14 @@ export default function OpportunitiesPage() {
   }, [vacancies, filters, sortBy])
 
   const updateFilter = <K extends keyof FiltersState>(key: K, value: FiltersState[K]) => {
-    setFilters(prev => ({ ...prev, [key]: value }))
+    setFilters(prev => {
+      const next = { ...prev, [key]: value } as FiltersState
+      if (key === 'opportunityType') {
+        next.position = []
+        next.gender = 'all'
+      }
+      return next
+    })
   }
 
   const togglePosition = (position: string) => {
@@ -391,24 +398,26 @@ export default function OpportunitiesPage() {
               )}
 
               {/* Gender */}
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">
-                  Gender
-                </label>
-                <div className="space-y-2">
-                  {(['all', 'Men', 'Women'] as const).map((gender) => (
-                    <label key={gender} className="flex items-center gap-2 cursor-pointer">
-                      <input
-                        type="radio"
-                        checked={filters.gender === gender}
-                        onChange={() => updateFilter('gender', gender)}
-                        className="w-4 h-4 text-blue-600"
-                      />
-                      <span className="text-sm text-gray-700">{gender === 'all' ? 'All' : gender}</span>
-                    </label>
-                  ))}
+              {filters.opportunityType !== 'coach' && (
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">
+                    Gender
+                  </label>
+                  <div className="space-y-2">
+                    {(['all', 'Men', 'Women'] as const).map((gender) => (
+                      <label key={gender} className="flex items-center gap-2 cursor-pointer">
+                        <input
+                          type="radio"
+                          checked={filters.gender === gender}
+                          onChange={() => updateFilter('gender', gender)}
+                          className="w-4 h-4 text-blue-600"
+                        />
+                        <span className="text-sm text-gray-700">{gender === 'all' ? 'All' : gender}</span>
+                      </label>
+                    ))}
+                  </div>
                 </div>
-              </div>
+              )}
 
               {/* Location */}
               <div>
@@ -520,7 +529,6 @@ export default function OpportunitiesPage() {
                 {filteredVacancies.map((vacancy) => {
                   const club = clubs[vacancy.club_id]
                   const isApplied = userApplications.includes(vacancy.id)
-                  console.log(`Rendering vacancy ${vacancy.id}: hasApplied = ${isApplied}, userApplications length = ${userApplications.length}`)
                   return (
                     <VacancyCard
                       key={vacancy.id}

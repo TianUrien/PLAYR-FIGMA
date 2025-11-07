@@ -72,9 +72,9 @@ export default function ApplyToVacancyModal({
     setIsSubmitting(true)
     setError(null)
 
-    // ⚡ INSTANT UI UPDATE - Show "Applied!" immediately
-    onSuccess(vacancy.id)
-    onClose()
+  // ⚡ INSTANT UI UPDATE - Show "Applied!" immediately
+  onSuccess(vacancy.id)
+  onClose()
 
     // Background database operation
     try {
@@ -91,7 +91,6 @@ export default function ApplyToVacancyModal({
         // Check for duplicate application error (code 23505 = unique violation)
         if (insertError.code === '23505') {
           // User already applied - UI already shows correct state
-          console.log('✅ Application already exists (idempotent)')
           addToast('Application confirmed!', 'success')
         } else {
           // Real error - revert optimistic update
@@ -145,10 +144,12 @@ export default function ApplyToVacancyModal({
         <form onSubmit={handleSubmit} className="p-6 space-y-6">
           {/* Vacancy Info */}
           <div className="bg-gray-50 rounded-lg p-4 space-y-2">
-            <div className="flex items-center justify-between">
-              <span className="text-sm font-medium text-gray-700">Position:</span>
-              <span className="text-sm text-gray-900">{vacancy.position}</span>
-            </div>
+            {vacancy.opportunity_type === 'player' && vacancy.position && (
+              <div className="flex items-center justify-between">
+                <span className="text-sm font-medium text-gray-700">Position:</span>
+                <span className="text-sm text-gray-900">{vacancy.position}</span>
+              </div>
+            )}
             <div className="flex items-center justify-between">
               <span className="text-sm font-medium text-gray-700">Location:</span>
               <span className="text-sm text-gray-900">

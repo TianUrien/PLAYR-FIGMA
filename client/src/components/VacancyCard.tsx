@@ -36,11 +36,8 @@ export default function VacancyCard({
 }: VacancyCardProps) {
   const navigate = useNavigate()
 
-  console.log(`🎯 VacancyCard render for ${vacancy.id}: hasApplied =`, hasApplied)
-
   const handleApplyClick = () => {
     if (!onApply) return
-    console.log('🎯 Apply button clicked for vacancy:', vacancy.id)
     onApply()
   }
 
