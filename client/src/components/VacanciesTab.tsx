@@ -568,9 +568,15 @@ export default function VacanciesTab({ profileId, readOnly = false, triggerCreat
             setSelectedVacancy(null)
           }}
           vacancy={selectedVacancy}
-          onSuccess={() => {
-            // Add this vacancy to the applied set
-            setUserApplications(prev => new Set([...prev, selectedVacancy.id]))
+          onSuccess={(vacancyId) => {
+            setUserApplications(prev => new Set([...prev, vacancyId]))
+          }}
+          onError={(vacancyId) => {
+            setUserApplications(prev => {
+              const next = new Set(prev)
+              next.delete(vacancyId)
+              return next
+            })
           }}
         />
       )}

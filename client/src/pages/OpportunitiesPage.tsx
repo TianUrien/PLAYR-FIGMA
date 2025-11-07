@@ -32,7 +32,7 @@ export default function OpportunitiesPage() {
   const [vacancies, setVacancies] = useState<Vacancy[]>([])
   const [filteredVacancies, setFilteredVacancies] = useState<Vacancy[]>([])
   const [clubs, setClubs] = useState<Record<string, { id: string; full_name: string; avatar_url: string | null }>>({})
-  const [userApplications, setUserApplications] = useState<Set<string>>(new Set())
+  const [userApplications, setUserApplications] = useState<string[]>([])
   const [selectedVacancy, setSelectedVacancy] = useState<Vacancy | null>(null)
   const [showApplyModal, setShowApplyModal] = useState(false)
   const [showDetailView, setShowDetailView] = useState(false)
@@ -109,13 +109,18 @@ export default function OpportunitiesPage() {
     })
   }, [])
 
-  const fetchUserApplications = useCallback(async () => {
-    if (!user || profile?.role !== 'player') return
+  const fetchUserApplications = useCallback(async (options?: { skipCache?: boolean }) => {
+    if (!user || (profile?.role !== 'player' && profile?.role !== 'coach')) return
 
     await monitor.measure('fetch_user_applications', async () => {
       const cacheKey = `user-applications-${user.id}`
+      const shouldSkipCache = options?.skipCache === true
       
       try {
+        if (shouldSkipCache) {
+          requestCache.invalidate(cacheKey)
+        }
+
         const appliedVacancyIds = await requestCache.dedupe(
           cacheKey,
           async () => {
@@ -126,14 +131,18 @@ export default function OpportunitiesPage() {
 
             if (error) throw error
 
-            return new Set(
-              (data as { vacancy_id: string }[])?.map(app => app.vacancy_id) || []
-            )
+            return (data as { vacancy_id: string }[])?.map(app => app.vacancy_id) || []
           },
-          30000 // 30 second cache for applications
+          shouldSkipCache ? 0 : 30000 // disable cache when explicitly requested
         )
-        
-        setUserApplications(appliedVacancyIds)
+
+        setUserApplications(prev => {
+          if (shouldSkipCache) {
+            const merged = new Set([...prev, ...appliedVacancyIds])
+            return Array.from(merged)
+          }
+          return appliedVacancyIds
+        })
       } catch (error) {
         logger.error('Error fetching user applications:', error)
       }
@@ -510,6 +519,8 @@ export default function OpportunitiesPage() {
               <div className={viewMode === 'grid' ? 'grid grid-cols-1 md:grid-cols-2 gap-6' : 'space-y-4'}>
                 {filteredVacancies.map((vacancy) => {
                   const club = clubs[vacancy.club_id]
+                  const isApplied = userApplications.includes(vacancy.id)
+                  console.log(`Rendering vacancy ${vacancy.id}: hasApplied = ${isApplied}, userApplications length = ${userApplications.length}`)
                   return (
                     <VacancyCard
                       key={vacancy.id}
@@ -522,14 +533,14 @@ export default function OpportunitiesPage() {
                         setShowDetailView(true)
                       }}
                       onApply={
-                        user && (profile?.role === 'player' || profile?.role === 'coach') && !userApplications.has(vacancy.id)
+                        user && (profile?.role === 'player' || profile?.role === 'coach') && !isApplied
                           ? () => {
                               setSelectedVacancy(vacancy)
                               setShowApplyModal(true)
                             }
                           : undefined
                       }
-                      hasApplied={userApplications.has(vacancy.id)}
+                      hasApplied={isApplied}
                     />
                   )
                 })}
@@ -551,14 +562,14 @@ export default function OpportunitiesPage() {
             setSelectedVacancy(null)
           }}
           onApply={
-            user && (profile?.role === 'player' || profile?.role === 'coach') && !userApplications.has(selectedVacancy.id)
+            user && (profile?.role === 'player' || profile?.role === 'coach') && !userApplications.includes(selectedVacancy.id)
               ? () => {
                   setShowDetailView(false)
                   setShowApplyModal(true)
                 }
               : undefined
           }
-          hasApplied={userApplications.has(selectedVacancy.id)}
+          hasApplied={userApplications.includes(selectedVacancy.id)}
         />
       )}
 
@@ -568,23 +579,22 @@ export default function OpportunitiesPage() {
           isOpen={showApplyModal}
           onClose={() => {
             setShowApplyModal(false)
-            setSelectedVacancy(null)
+            // Don't clear selectedVacancy immediately - let it persist for the render
+            setTimeout(() => setSelectedVacancy(null), 100)
           }}
           vacancy={selectedVacancy}
-          onSuccess={() => {
-            // ⚡ OPTIMISTIC UPDATE: Instant UI feedback
-            setUserApplications(prev => new Set([...prev, selectedVacancy.id]))
-            
-            // Background sync to ensure consistency
-            fetchUserApplications()
-          }}
-          onError={() => {
-            // 🔄 ROLLBACK: Remove optimistic update on error
+          onSuccess={(vacancyId) => {
             setUserApplications(prev => {
-              const next = new Set(prev)
-              next.delete(selectedVacancy.id)
-              return next
+              if (prev.includes(vacancyId)) {
+                return prev
+              }
+              return [...prev, vacancyId]
             })
+            fetchUserApplications({ skipCache: true })
+          }}
+          onError={(vacancyId) => {
+            setUserApplications(prev => prev.filter(id => id !== vacancyId))
+            fetchUserApplications({ skipCache: true })
           }}
         />
       )}

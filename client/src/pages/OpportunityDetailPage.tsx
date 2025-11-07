@@ -151,16 +151,19 @@ export default function OpportunityDetailPage() {
           isOpen={showApplyModal}
           onClose={() => setShowApplyModal(false)}
           vacancy={vacancy}
-          onSuccess={() => {
+          onSuccess={(vacancyId) => {
+            void vacancyId
             // ⚡ OPTIMISTIC UPDATE: Instant UI feedback
             setHasApplied(true)
             
             // Background sync to ensure consistency
             refreshApplicationStatus()
           }}
-          onError={() => {
+          onError={(vacancyId) => {
+            void vacancyId
             // 🔄 ROLLBACK: Revert optimistic update on error
             setHasApplied(false)
+            refreshApplicationStatus()
           }}
         />
       )}

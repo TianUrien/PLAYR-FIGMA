@@ -11,8 +11,8 @@ interface ApplyToVacancyModalProps {
   isOpen: boolean
   onClose: () => void
   vacancy: Vacancy
-  onSuccess: () => void
-  onError?: () => void
+  onSuccess: (vacancyId: string) => void
+  onError?: (vacancyId: string) => void
 }
 
 export default function ApplyToVacancyModal({
@@ -72,16 +72,12 @@ export default function ApplyToVacancyModal({
     setIsSubmitting(true)
     setError(null)
 
-    // ⚡ INSTANT UI UPDATE - Parent state already updated via button click
-    const startTime = performance.now()
-    onSuccess() // Confirm state update in parent
-    onClose() // Close modal
-    const uiUpdateTime = performance.now() - startTime
-    console.log(`✅ Modal closed in ${uiUpdateTime.toFixed(2)}ms`)
+    // ⚡ INSTANT UI UPDATE - Show "Applied!" immediately
+    onSuccess(vacancy.id)
+    onClose()
 
-    // STEP 2: Background database operation with rollback on error
+    // Background database operation
     try {
-      // Idempotent insert: use upsert-like behavior
       const { error: insertError } = await supabase
         .from('vacancy_applications')
         .insert({
@@ -94,25 +90,24 @@ export default function ApplyToVacancyModal({
       if (insertError) {
         // Check for duplicate application error (code 23505 = unique violation)
         if (insertError.code === '23505') {
-          // Idempotent success - user already applied, UI is correct
+          // User already applied - UI already shows correct state
           console.log('✅ Application already exists (idempotent)')
           addToast('Application confirmed!', 'success')
         } else {
-          // Real error - ROLLBACK optimistic update
+          // Real error - revert optimistic update
           console.error('❌ Error applying to vacancy:', insertError)
-          onError?.() // Revert UI state
+          onError?.(vacancy.id)
           addToast('Failed to submit application. Please try again.', 'error')
         }
       } else {
         // Success! Application created
-        console.log('✅ Application submitted successfully')
         addToast('Application submitted successfully!', 'success')
-        setCoverLetter('') // Clear for next use
       }
+      setCoverLetter('')
     } catch (err) {
-      // Network error or unexpected failure - ROLLBACK
+      // Network error - UI already updated
       console.error('❌ Unexpected error:', err)
-      onError?.() // Revert UI state
+      onError?.(vacancy.id)
       addToast('Network error. Please check your connection and try again.', 'error')
     } finally {
       setIsSubmitting(false)
