@@ -100,6 +100,19 @@ export default function ApplyToVacancyModal({
         if (insertError.code === '23505') {
           // User already applied - UI already shows correct state
           addToast('Application confirmed!', 'success')
+        } else if (insertError.code === '42501' || insertError.message?.includes('row-level security')) {
+          // RLS policy blocked the insert - role mismatch
+          console.error('❌ Role mismatch - RLS policy blocked application:', insertError)
+          onError?.(vacancy.id)
+          
+          // Show user-friendly role mismatch message
+          if (vacancy.opportunity_type === 'coach') {
+            addToast('Only coaches can apply to coach vacancies.', 'error')
+          } else if (vacancy.opportunity_type === 'player') {
+            addToast('Only players can apply to player vacancies.', 'error')
+          } else {
+            addToast('You cannot apply to this vacancy due to role restrictions.', 'error')
+          }
         } else {
           // Real error - revert optimistic update
           console.error('❌ Error applying to vacancy:', insertError)
