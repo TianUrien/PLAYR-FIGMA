@@ -11,6 +11,7 @@ export default function Header() {
   const { count: unreadCount } = useUnreadMessages()
   const [dropdownOpen, setDropdownOpen] = useState(false)
   const dropdownRef = useRef<HTMLDivElement>(null)
+  const headerRef = useRef<HTMLElement>(null)
   const fullName = profile?.full_name ?? ''
   const profileInitials = fullName
     .trim()
@@ -33,13 +34,55 @@ export default function Header() {
     }
   }, [dropdownOpen])
 
+  useEffect(() => {
+    if (typeof window === 'undefined' || !headerRef.current) {
+      return
+    }
+
+    const updateHeaderMetrics = () => {
+      if (!headerRef.current) {
+        return
+      }
+
+      const root = document.documentElement
+      const headerHeight = headerRef.current.offsetHeight
+      const safeAreaTop = parseFloat(
+        getComputedStyle(root).getPropertyValue('--app-safe-area-top') || '0'
+      )
+
+      root.style.setProperty('--app-header-height', `${headerHeight}px`)
+      root.style.setProperty('--app-header-offset', `${headerHeight + safeAreaTop}px`)
+    }
+
+    updateHeaderMetrics()
+
+    let observer: ResizeObserver | null = null
+
+    if ('ResizeObserver' in window) {
+      observer = new ResizeObserver(() => updateHeaderMetrics())
+      observer.observe(headerRef.current)
+    }
+
+    window.addEventListener('resize', updateHeaderMetrics)
+    window.addEventListener('orientationchange', updateHeaderMetrics)
+
+    return () => {
+      observer?.disconnect()
+      window.removeEventListener('resize', updateHeaderMetrics)
+      window.removeEventListener('orientationchange', updateHeaderMetrics)
+    }
+  }, [])
+
   const handleSignOut = async () => {
     await signOut()
     navigate('/')
   }
 
   return (
-    <header className="fixed top-0 left-0 right-0 z-50 bg-white border-b border-gray-200">
+    <header
+      ref={headerRef}
+      className="fixed top-0 left-0 right-0 z-50 bg-white border-b border-gray-200"
+    >
       <nav className="max-w-7xl mx-auto px-4 md:px-6 py-4">
         <div className="flex items-center justify-between">
           {/* Logo & Tagline */}

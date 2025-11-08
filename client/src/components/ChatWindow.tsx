@@ -476,113 +476,111 @@ export default function ChatWindow({ conversation, currentUserId, onBack, onMess
   }
 
   return (
-    <div className="flex h-full flex-col">
-      <div className="flex-1 overflow-y-auto bg-gray-50">
-        <div className="sticky top-0 z-20 flex items-center gap-3 border-b border-gray-200 bg-white px-4 py-4 shadow-sm md:px-6">
-          <button
-            onClick={onBack}
-            className="md:hidden rounded-lg p-2 transition-colors hover:bg-gray-100"
-            aria-label="Back to conversations"
-          >
-            <ArrowLeft className="h-5 w-5 text-gray-600" />
-          </button>
+    <div className="flex h-full flex-col bg-gray-50">
+      <div className="sticky top-[var(--app-header-offset,0px)] z-30 flex flex-shrink-0 items-center gap-3 border-b border-gray-200 bg-white px-4 py-4 shadow-sm md:px-6">
+        <button
+          onClick={onBack}
+          className="md:hidden rounded-lg p-2 transition-colors hover:bg-gray-100"
+          aria-label="Back to conversations"
+        >
+          <ArrowLeft className="h-5 w-5 text-gray-600" />
+        </button>
 
-          {avatarUrl ? (
-            <img
-              src={avatarUrl}
-              alt={conversation.otherParticipant?.full_name}
-              className="h-10 w-10 rounded-full object-cover"
-            />
-          ) : (
-            <div className="flex h-10 w-10 items-center justify-center rounded-full bg-gradient-to-br from-purple-400 to-purple-600 text-white font-semibold">
-              {conversation.otherParticipant?.full_name?.charAt(0).toUpperCase()}
-            </div>
-          )}
-
-          <div className="min-w-0 flex-1">
-            <h2 className="truncate font-semibold text-gray-900">
-              {conversation.otherParticipant?.full_name}
-            </h2>
-            <div className="flex items-center gap-2">
-              <span
-                className={`inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium ${
-                  conversation.otherParticipant?.role === 'club'
-                    ? 'bg-orange-50 text-orange-700'
-                    : conversation.otherParticipant?.role === 'coach'
-                    ? 'bg-purple-50 text-purple-700'
-                    : 'bg-blue-50 text-blue-700'
-                }`}
-              >
-                {conversation.otherParticipant?.role === 'club'
-                  ? 'Club'
-                  : conversation.otherParticipant?.role === 'coach'
-                  ? 'Coach'
-                  : 'Player'}
-              </span>
-            </div>
+        {avatarUrl ? (
+          <img
+            src={avatarUrl}
+            alt={conversation.otherParticipant?.full_name}
+            className="h-12 w-12 rounded-full object-cover shadow-sm"
+          />
+        ) : (
+          <div className="flex h-12 w-12 items-center justify-center rounded-full bg-gradient-to-br from-purple-400 to-purple-600 text-lg font-semibold text-white shadow-sm">
+            {conversation.otherParticipant?.full_name?.charAt(0).toUpperCase()}
           </div>
-        </div>
+        )}
 
-        <div className="space-y-4 px-4 pb-6 pt-4 md:px-6">
-          {messages.length === 0 ? (
-            <div className="flex min-h-[240px] items-center justify-center text-center text-gray-500">
-              No messages yet. Start the conversation!
-            </div>
-          ) : (
-            <>
-              {messages.map((message, index) => {
-                const isMyMessage = message.sender_id === currentUserId
-                const isPending = message.id.startsWith('optimistic-')
-                const showTimestamp =
-                  index === 0 ||
-                  new Date(message.sent_at).getTime() - new Date(messages[index - 1].sent_at).getTime() > 300000
-
-                return (
-                  <div key={message.id}>
-                    {showTimestamp && (
-                      <div className="mb-2 text-center text-xs text-gray-500">
-                        {format(new Date(message.sent_at), 'MMM d, yyyy h:mm a')}
-                      </div>
-                    )}
-                    <div className={`flex ${isMyMessage ? 'justify-end' : 'justify-start'}`}>
-                      <div
-                        className={`max-w-[70%] rounded-2xl px-4 py-2 ${
-                          isMyMessage
-                            ? isPending
-                              ? 'bg-gradient-to-br from-[#6366f1]/70 to-[#8b5cf6]/70 text-white'
-                              : 'bg-gradient-to-br from-[#6366f1] to-[#8b5cf6] text-white'
-                            : 'bg-white text-gray-900 border border-gray-200'
-                        }`}
-                      >
-                        <p className="text-sm whitespace-pre-wrap break-words">{message.content}</p>
-                        <div className="mt-1 flex items-center gap-2">
-                          <p className={`text-xs ${isMyMessage ? 'text-purple-100' : 'text-gray-500'}`}>
-                            {format(new Date(message.sent_at), 'h:mm a')}
-                          </p>
-                          {isPending && (
-                            <span className="flex items-center gap-1 text-xs text-purple-200">
-                              <svg className="h-3 w-3 animate-spin" viewBox="0 0 24 24">
-                                <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" fill="none" />
-                                <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z" />
-                              </svg>
-                              Sending
-                            </span>
-                          )}
-                        </div>
-                      </div>
-                    </div>
-                  </div>
-                )
-              })}
-              <div ref={messagesEndRef} />
-            </>
-          )}
+        <div className="min-w-0 flex-1">
+          <h2 className="truncate text-lg font-semibold text-gray-900 md:text-xl">
+            {conversation.otherParticipant?.full_name}
+          </h2>
+          <div className="mt-1 flex flex-wrap items-center gap-2 text-sm text-gray-500">
+            <span
+              className={`inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-medium md:text-sm ${
+                conversation.otherParticipant?.role === 'club'
+                  ? 'bg-orange-50 text-orange-700'
+                  : conversation.otherParticipant?.role === 'coach'
+                  ? 'bg-purple-50 text-purple-700'
+                  : 'bg-blue-50 text-blue-700'
+              }`}
+            >
+              {conversation.otherParticipant?.role === 'club'
+                ? 'Club'
+                : conversation.otherParticipant?.role === 'coach'
+                ? 'Coach'
+                : 'Player'}
+            </span>
+          </div>
         </div>
       </div>
 
-      <form onSubmit={handleSendMessage} className="p-4 bg-white border-t border-gray-200">
-        <div className="flex items-end gap-2">
-          <div className="flex-1 relative">
+      <div className="flex-1 overflow-y-auto px-4 pb-24 pt-6 scroll-smooth md:px-6 md:pb-20">
+        {messages.length === 0 ? (
+          <div className="flex min-h-[240px] items-center justify-center text-center text-gray-500">
+            No messages yet. Start the conversation!
+          </div>
+        ) : (
+          <div className="flex flex-col gap-4">
+            {messages.map((message, index) => {
+              const isMyMessage = message.sender_id === currentUserId
+              const isPending = message.id.startsWith('optimistic-')
+              const showTimestamp =
+                index === 0 ||
+                new Date(message.sent_at).getTime() - new Date(messages[index - 1].sent_at).getTime() > 300000
+
+              return (
+                <div key={message.id}>
+                  {showTimestamp && (
+                    <div className="mb-3 text-center text-xs font-medium uppercase tracking-wide text-gray-400">
+                      {format(new Date(message.sent_at), 'MMM d, yyyy h:mm a')}
+                    </div>
+                  )}
+                  <div className={`flex ${isMyMessage ? 'justify-end' : 'justify-start'}`}>
+                    <div
+                      className={`max-w-[75%] rounded-2xl px-4 py-3 text-sm shadow-sm md:max-w-[70%] ${
+                        isMyMessage
+                          ? isPending
+                            ? 'bg-gradient-to-br from-[#6366f1]/70 to-[#8b5cf6]/70 text-white'
+                            : 'bg-gradient-to-br from-[#6366f1] to-[#8b5cf6] text-white'
+                          : 'bg-white text-gray-900'
+                      } ${!isMyMessage ? 'border border-gray-200' : ''}`}
+                    >
+                      <p className="whitespace-pre-wrap break-words leading-relaxed">{message.content}</p>
+                      <div className="mt-2 flex items-center gap-2 text-xs">
+                        <p className={isMyMessage ? 'text-purple-100' : 'text-gray-500'}>
+                          {format(new Date(message.sent_at), 'h:mm a')}
+                        </p>
+                        {isPending && (
+                          <span className="flex items-center gap-1 text-purple-100">
+                            <svg className="h-3 w-3 animate-spin" viewBox="0 0 24 24">
+                              <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" fill="none" />
+                              <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z" />
+                            </svg>
+                            Sending
+                          </span>
+                        )}
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              )
+            })}
+            <div ref={messagesEndRef} />
+          </div>
+        )}
+      </div>
+
+      <form onSubmit={handleSendMessage} className="flex-shrink-0 border-t border-gray-200 bg-white/95 px-4 py-4 backdrop-blur md:px-6">
+        <div className="flex items-end gap-3 md:gap-4">
+          <div className="relative flex-1">
             <textarea
               ref={inputRef}
               value={newMessage}
@@ -590,19 +588,19 @@ export default function ChatWindow({ conversation, currentUserId, onBack, onMess
               onKeyDown={handleKeyDown}
               placeholder="Type a message..."
               rows={1}
-              className="w-full px-4 py-3 bg-gray-50 border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-purple-500 focus:border-transparent resize-none min-h-[48px] max-h-[120px]"
+              className="w-full resize-none rounded-xl border border-transparent bg-gray-100 px-4 py-3 text-sm shadow-inner focus:border-purple-200 focus:bg-white focus:outline-none focus:ring-2 focus:ring-purple-100 md:rounded-2xl md:px-5 md:py-3"
             />
-            <div className="absolute bottom-2 right-2 text-xs text-gray-400">
+            <div className="pointer-events-none absolute bottom-2 right-3 text-xs font-medium text-gray-400 md:bottom-2.5 md:right-3">
               {newMessage.length}/1000
             </div>
           </div>
           <button
             type="submit"
             disabled={!newMessage.trim() || sending}
-            className="p-3 bg-gradient-to-br from-[#6366f1] to-[#8b5cf6] text-white rounded-xl hover:shadow-lg transition-all disabled:opacity-50 disabled:cursor-not-allowed flex-shrink-0"
+            className="flex h-12 w-12 items-center justify-center rounded-xl bg-gradient-to-br from-[#6366f1] to-[#8b5cf6] text-white shadow-lg transition-all duration-200 hover:shadow-xl focus:outline-none focus:ring-2 focus:ring-purple-300 focus:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-60"
             aria-label="Send message"
           >
-            <Send className="w-5 h-5" />
+            <Send className="h-5 w-5" />
           </button>
         </div>
       </form>

@@ -1,8 +1,8 @@
 import { useState, useEffect, useCallback } from 'react'
 import { Edit2, Plus, X, Trash2 } from 'lucide-react'
-import { supabase } from '../lib/supabase'
-import { useAuthStore } from '../lib/auth'
-import type { PlayingHistory } from '../lib/database.types'
+import { supabase } from '@/lib/supabase'
+import { useAuthStore } from '@/lib/auth'
+import type { PlayingHistory } from '@/lib/supabase'
 import Button from './Button'
 
 const HOCKEY_POSITIONS = [
@@ -12,6 +12,10 @@ const HOCKEY_POSITIONS = [
   'Forward'
 ] as const
 
+type EditablePlayingHistory = Omit<PlayingHistory, 'achievements'> & {
+  achievements: string[]
+}
+
 interface HistoryTabProps {
   profileId?: string
   readOnly?: boolean
@@ -20,10 +24,10 @@ interface HistoryTabProps {
 export default function HistoryTab({ profileId, readOnly = false }: HistoryTabProps) {
   const { user } = useAuthStore()
   const targetUserId = profileId || user?.id
-  const [history, setHistory] = useState<PlayingHistory[]>([])
+  const [history, setHistory] = useState<EditablePlayingHistory[]>([])
   const [isLoading, setIsLoading] = useState(true)
   const [isEditing, setIsEditing] = useState(false)
-  const [editedHistory, setEditedHistory] = useState<PlayingHistory[]>([])
+  const [editedHistory, setEditedHistory] = useState<EditablePlayingHistory[]>([])
   const [errors, setErrors] = useState<Record<string, string>>({})
 
   const fetchHistory = useCallback(async () => {
@@ -38,7 +42,13 @@ export default function HistoryTab({ profileId, readOnly = false }: HistoryTabPr
         .order('display_order', { ascending: false })
 
       if (error) throw error
-      setHistory(data || [])
+
+      const normalizedHistory = (data || []).map(entry => ({
+        ...entry,
+        achievements: entry.achievements ?? []
+      }))
+
+      setHistory(normalizedHistory)
     } catch (error) {
       console.error('Error fetching playing history:', error)
     } finally {
@@ -53,7 +63,10 @@ export default function HistoryTab({ profileId, readOnly = false }: HistoryTabPr
   }, [targetUserId, fetchHistory])
 
   const handleEdit = () => {
-    setEditedHistory(JSON.parse(JSON.stringify(history)))
+    setEditedHistory(history.map(entry => ({
+      ...entry,
+      achievements: [...entry.achievements]
+    })))
     setIsEditing(true)
     setErrors({})
   }
@@ -65,32 +78,36 @@ export default function HistoryTab({ profileId, readOnly = false }: HistoryTabPr
   }
 
   const handleAddEntry = () => {
-    const newEntry: PlayingHistory = {
-      id: `temp-${Date.now()}`,
-      user_id: user?.id || '',
-      club_name: '',
-      position_role: '',
-      years: '',
-      division_league: '',
-      achievements: [],
-      display_order: editedHistory.length,
-      created_at: new Date().toISOString(),
-      updated_at: new Date().toISOString(),
-    }
-    setEditedHistory([newEntry, ...editedHistory])
+    setEditedHistory(prev => {
+      const newEntry: EditablePlayingHistory = {
+        id: `temp-${Date.now()}`,
+        user_id: user?.id || '',
+        club_name: '',
+        position_role: '',
+        years: '',
+        division_league: '',
+        achievements: [],
+        display_order: prev.length,
+        created_at: new Date().toISOString(),
+        updated_at: new Date().toISOString(),
+      }
+      return [newEntry, ...prev]
+    })
   }
 
   const handleDeleteEntry = (index: number) => {
-    setEditedHistory(editedHistory.filter((_, i) => i !== index))
+    setEditedHistory(prev => prev.filter((_, i) => i !== index))
   }
 
-  const handleFieldChange = (index: number, field: keyof PlayingHistory, value: string) => {
-    const updated = [...editedHistory]
-    updated[index] = { ...updated[index], [field]: value }
-    setEditedHistory(updated)
+  const handleFieldChange = (index: number, field: keyof EditablePlayingHistory, value: string) => {
+    setEditedHistory(prev =>
+      prev.map((entry, idx) =>
+        idx === index ? { ...entry, [field]: value } : entry
+      )
+    )
     
     // Clear error for this field
-    const errorKey = `${index}-${field}`
+    const errorKey = `${index}-${String(field)}`
     if (errors[errorKey]) {
       const newErrors = { ...errors }
       delete newErrors[errorKey]
@@ -99,29 +116,37 @@ export default function HistoryTab({ profileId, readOnly = false }: HistoryTabPr
   }
 
   const handleAddAchievement = (index: number) => {
-    const updated = [...editedHistory]
-    updated[index] = {
-      ...updated[index],
-      achievements: [...updated[index].achievements, '']
-    }
-    setEditedHistory(updated)
+    setEditedHistory(prev =>
+      prev.map((entry, idx) =>
+        idx === index
+          ? { ...entry, achievements: [...entry.achievements, ''] }
+          : entry
+      )
+    )
   }
 
   const handleAchievementChange = (entryIndex: number, achIndex: number, value: string) => {
-    const updated = [...editedHistory]
-    const newAchievements = [...updated[entryIndex].achievements]
-    newAchievements[achIndex] = value
-    updated[entryIndex] = { ...updated[entryIndex], achievements: newAchievements }
-    setEditedHistory(updated)
+    setEditedHistory(prev =>
+      prev.map((entry, idx) => {
+        if (idx !== entryIndex) return entry
+        const achievements = [...entry.achievements]
+        achievements[achIndex] = value
+        return { ...entry, achievements }
+      })
+    )
   }
 
   const handleRemoveAchievement = (entryIndex: number, achIndex: number) => {
-    const updated = [...editedHistory]
-    updated[entryIndex] = {
-      ...updated[entryIndex],
-      achievements: updated[entryIndex].achievements.filter((_, i) => i !== achIndex)
-    }
-    setEditedHistory(updated)
+    setEditedHistory(prev =>
+      prev.map((entry, idx) =>
+        idx === entryIndex
+          ? {
+              ...entry,
+              achievements: entry.achievements.filter((_, i: number) => i !== achIndex)
+            }
+          : entry
+      )
+    )
   }
 
   const validateFields = (): boolean => {
@@ -176,7 +201,7 @@ export default function HistoryTab({ profileId, readOnly = false }: HistoryTabPr
         ...entry,
         display_order: editedHistory.length - index,
         user_id: user.id,
-        achievements: entry.achievements.filter(a => a.trim() !== ''),
+        achievements: entry.achievements.filter((achievement: string) => achievement.trim() !== ''),
         updated_at: new Date().toISOString(),
       }))
 
@@ -193,7 +218,7 @@ export default function HistoryTab({ profileId, readOnly = false }: HistoryTabPr
               division_league: entry.division_league,
               achievements: entry.achievements,
               display_order: entry.display_order,
-            } as never)
+            })
 
           if (insertError) throw insertError
         } else {
@@ -208,7 +233,7 @@ export default function HistoryTab({ profileId, readOnly = false }: HistoryTabPr
               achievements: entry.achievements,
               display_order: entry.display_order,
               updated_at: entry.updated_at,
-            } as never)
+            })
             .eq('id', entry.id)
 
           if (updateError) throw updateError

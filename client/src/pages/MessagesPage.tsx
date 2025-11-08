@@ -437,12 +437,12 @@ export default function MessagesPage() {
   return (
     <div className="min-h-screen bg-gray-50">
       <Header />
-      
-      <main className="max-w-7xl mx-auto px-4 md:px-6 pt-24 pb-6">
-  <div className="bg-white rounded-2xl shadow-sm overflow-hidden h-[calc(100vh-140px)]">
-          <div className="flex h-full">
+
+      <main className="max-w-7xl mx-auto px-4 pb-12 pt-[calc(var(--app-header-offset,0px)+1.5rem)] md:px-6">
+        <div className="flex min-h-[calc(100vh-var(--app-header-offset,0px)-4rem)] flex-col overflow-hidden rounded-3xl border border-gray-100 bg-white shadow-sm">
+          <div className="flex min-h-0 flex-1">
             {/* Left Column - Conversations List */}
-            <div className={`w-full md:w-96 border-r border-gray-200 flex flex-col ${selectedConversationId ? 'hidden md:flex' : 'flex'}`}>
+            <div className={`flex w-full flex-shrink-0 flex-col border-b border-gray-100 md:w-96 md:border-b-0 md:border-r ${selectedConversationId ? 'hidden md:flex' : 'flex'}`}>
               {/* Header */}
               <div className="p-4 border-b border-gray-200">
                 <h1 className="text-2xl font-bold text-gray-900 mb-4">Messages</h1>
@@ -461,7 +461,7 @@ export default function MessagesPage() {
               </div>
 
               {/* Conversations List */}
-              <div className="flex-1 overflow-y-auto">
+              <div className="flex-1 min-h-0 overflow-y-auto">
                 {filteredConversations.length === 0 ? (
                   <div className="flex flex-col items-center justify-center h-full p-8 text-center">
                     <div className="w-16 h-16 bg-gray-100 rounded-full flex items-center justify-center mb-4">
@@ -484,7 +484,7 @@ export default function MessagesPage() {
             </div>
 
             {/* Right Column - Chat Window */}
-            <div className={`flex-1 ${selectedConversationId ? 'flex' : 'hidden md:flex'} flex-col`}>
+            <div className={`flex min-h-0 flex-1 flex-col ${selectedConversationId ? 'flex' : 'hidden md:flex'}`}>
               {selectedConversation ? (
                 <ChatWindow
                   conversation={selectedConversation}
@@ -498,7 +498,7 @@ export default function MessagesPage() {
                   onConversationRead={handleConversationRead}
                 />
               ) : (
-                <div className="flex flex-col items-center justify-center h-full p-8 text-center bg-gray-50">
+                <div className="flex h-full min-h-[320px] flex-col items-center justify-center bg-gray-50 p-8 text-center">
                   <div className="w-20 h-20 bg-gray-100 rounded-full flex items-center justify-center mb-4">
                     <MessageCircle className="w-10 h-10 text-gray-400" />
                   </div>

@@ -13,6 +13,12 @@
   --color-playr-danger: #ef4444;
   --color-playr-orange: #ff9500;
 
+  /* Layout metrics */
+  --app-safe-area-top: 0px;
+  --app-safe-area-bottom: 0px;
+  --app-header-height: 0px;
+  --app-header-offset: 0px;
+
   /* Dark Mode Palette */
   --color-dark-bg: #0a0a0a;
   --color-dark-surface: #18181b;
@@ -39,6 +45,11 @@
 
   /* Safe Area Insets for iOS Devices (notch, home indicator) */
   @supports (padding-top: env(safe-area-inset-top)) {
+    :root {
+      --app-safe-area-top: env(safe-area-inset-top);
+      --app-safe-area-bottom: env(safe-area-inset-bottom);
+    }
+
     body {
       padding-top: env(safe-area-inset-top);
       padding-bottom: env(safe-area-inset-bottom);
