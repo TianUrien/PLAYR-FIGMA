@@ -122,16 +122,9 @@ export default function VacancyCard({
           {vacancy.opportunity_type === 'player' ? 'Player' : 'Coach'}
         </span>
         {vacancy.opportunity_type === 'player' && vacancy.gender && (
-          <span className={`inline-flex h-7 items-center gap-1.5 rounded-full px-3 text-xs font-medium ${
+          <span className={`inline-flex h-7 items-center rounded-full px-3 text-xs font-medium ${
             vacancy.gender === 'Men' ? 'bg-blue-50 text-blue-700' : 'bg-pink-50 text-pink-700'
           }`}>
-            <span
-              className={`flex h-4 w-4 items-center justify-center text-sm leading-none ${
-                vacancy.gender === 'Men' ? 'text-blue-600' : 'text-pink-600'
-              }`}
-            >
-              {vacancy.gender === 'Men' ? '♂' : '♀'}
-            </span>
             <span className="leading-none">{vacancy.gender === 'Men' ? 'Men' : 'Women'}</span>
           </span>
         )}
