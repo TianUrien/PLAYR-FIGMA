@@ -476,108 +476,108 @@ export default function ChatWindow({ conversation, currentUserId, onBack, onMess
   }
 
   return (
-    <div className="flex flex-col h-full">
-      <div className="p-4 border-b border-gray-200 flex items-center gap-3 bg-white">
-        <button
-          onClick={onBack}
-          className="md:hidden p-2 hover:bg-gray-100 rounded-lg transition-colors"
-          aria-label="Back to conversations"
-        >
-          <ArrowLeft className="w-5 h-5 text-gray-600" />
-        </button>
+    <div className="flex h-full flex-col">
+      <div className="flex-1 overflow-y-auto bg-gray-50">
+        <div className="sticky top-0 z-20 flex items-center gap-3 border-b border-gray-200 bg-white px-4 py-4 shadow-sm md:px-6">
+          <button
+            onClick={onBack}
+            className="md:hidden rounded-lg p-2 transition-colors hover:bg-gray-100"
+            aria-label="Back to conversations"
+          >
+            <ArrowLeft className="h-5 w-5 text-gray-600" />
+          </button>
 
-        {avatarUrl ? (
-          <img
-            src={avatarUrl}
-            alt={conversation.otherParticipant?.full_name}
-            className="w-10 h-10 rounded-full object-cover"
-          />
-        ) : (
-          <div className="w-10 h-10 rounded-full bg-gradient-to-br from-purple-400 to-purple-600 flex items-center justify-center text-white font-semibold">
-            {conversation.otherParticipant?.full_name?.charAt(0).toUpperCase()}
-          </div>
-        )}
+          {avatarUrl ? (
+            <img
+              src={avatarUrl}
+              alt={conversation.otherParticipant?.full_name}
+              className="h-10 w-10 rounded-full object-cover"
+            />
+          ) : (
+            <div className="flex h-10 w-10 items-center justify-center rounded-full bg-gradient-to-br from-purple-400 to-purple-600 text-white font-semibold">
+              {conversation.otherParticipant?.full_name?.charAt(0).toUpperCase()}
+            </div>
+          )}
 
-        <div className="flex-1 min-w-0">
-          <h2 className="font-semibold text-gray-900 truncate">
-            {conversation.otherParticipant?.full_name}
-          </h2>
-          <div className="flex items-center gap-2">
-            <span
-              className={`inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium ${
-                conversation.otherParticipant?.role === 'club'
-                  ? 'bg-orange-50 text-orange-700'
+          <div className="min-w-0 flex-1">
+            <h2 className="truncate font-semibold text-gray-900">
+              {conversation.otherParticipant?.full_name}
+            </h2>
+            <div className="flex items-center gap-2">
+              <span
+                className={`inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium ${
+                  conversation.otherParticipant?.role === 'club'
+                    ? 'bg-orange-50 text-orange-700'
+                    : conversation.otherParticipant?.role === 'coach'
+                    ? 'bg-purple-50 text-purple-700'
+                    : 'bg-blue-50 text-blue-700'
+                }`}
+              >
+                {conversation.otherParticipant?.role === 'club'
+                  ? 'Club'
                   : conversation.otherParticipant?.role === 'coach'
-                  ? 'bg-purple-50 text-purple-700'
-                  : 'bg-blue-50 text-blue-700'
-              }`}
-            >
-              {conversation.otherParticipant?.role === 'club'
-                ? 'Club'
-                : conversation.otherParticipant?.role === 'coach'
-                ? 'Coach'
-                : 'Player'}
-            </span>
+                  ? 'Coach'
+                  : 'Player'}
+              </span>
+            </div>
           </div>
         </div>
-      </div>
 
-      <div className="flex-1 overflow-y-auto p-4 space-y-4 bg-gray-50">
-        {messages.length === 0 ? (
-          <div className="flex items-center justify-center h-full">
-            <p className="text-gray-500 text-center">
+        <div className="space-y-4 px-4 pb-6 pt-4 md:px-6">
+          {messages.length === 0 ? (
+            <div className="flex min-h-[240px] items-center justify-center text-center text-gray-500">
               No messages yet. Start the conversation!
-            </p>
-          </div>
-        ) : (
-          <>
-            {messages.map((message, index) => {
-              const isMyMessage = message.sender_id === currentUserId
-              const isPending = message.id.startsWith('optimistic-')
-              const showTimestamp =
-                index === 0 ||
-                new Date(message.sent_at).getTime() - new Date(messages[index - 1].sent_at).getTime() > 300000
+            </div>
+          ) : (
+            <>
+              {messages.map((message, index) => {
+                const isMyMessage = message.sender_id === currentUserId
+                const isPending = message.id.startsWith('optimistic-')
+                const showTimestamp =
+                  index === 0 ||
+                  new Date(message.sent_at).getTime() - new Date(messages[index - 1].sent_at).getTime() > 300000
 
-              return (
-                <div key={message.id}>
-                  {showTimestamp && (
-                    <div className="text-center text-xs text-gray-500 mb-2">
-                      {format(new Date(message.sent_at), 'MMM d, yyyy h:mm a')}
-                    </div>
-                  )}
-                  <div className={`flex ${isMyMessage ? 'justify-end' : 'justify-start'}`}>
-                    <div
-                      className={`max-w-[70%] rounded-2xl px-4 py-2 ${
-                        isMyMessage
-                          ? isPending
-                            ? 'bg-gradient-to-br from-[#6366f1]/70 to-[#8b5cf6]/70 text-white'
-                            : 'bg-gradient-to-br from-[#6366f1] to-[#8b5cf6] text-white'
-                          : 'bg-white text-gray-900 border border-gray-200'
-                      }`}
-                    >
-                      <p className="text-sm whitespace-pre-wrap break-words">{message.content}</p>
-                      <div className="flex items-center gap-2 mt-1">
-                        <p className={`text-xs ${isMyMessage ? 'text-purple-100' : 'text-gray-500'}`}>
-                          {format(new Date(message.sent_at), 'h:mm a')}
-                        </p>
-                        {isPending && (
-                          <span className="text-xs text-purple-200 flex items-center gap-1">
-                            <svg className="animate-spin h-3 w-3" viewBox="0 0 24 24">
-                              <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" fill="none" />
-                              <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z" />
-                            </svg>
-                            Sending
-                          </span>
-                        )}
+                return (
+                  <div key={message.id}>
+                    {showTimestamp && (
+                      <div className="mb-2 text-center text-xs text-gray-500">
+                        {format(new Date(message.sent_at), 'MMM d, yyyy h:mm a')}
+                      </div>
+                    )}
+                    <div className={`flex ${isMyMessage ? 'justify-end' : 'justify-start'}`}>
+                      <div
+                        className={`max-w-[70%] rounded-2xl px-4 py-2 ${
+                          isMyMessage
+                            ? isPending
+                              ? 'bg-gradient-to-br from-[#6366f1]/70 to-[#8b5cf6]/70 text-white'
+                              : 'bg-gradient-to-br from-[#6366f1] to-[#8b5cf6] text-white'
+                            : 'bg-white text-gray-900 border border-gray-200'
+                        }`}
+                      >
+                        <p className="text-sm whitespace-pre-wrap break-words">{message.content}</p>
+                        <div className="mt-1 flex items-center gap-2">
+                          <p className={`text-xs ${isMyMessage ? 'text-purple-100' : 'text-gray-500'}`}>
+                            {format(new Date(message.sent_at), 'h:mm a')}
+                          </p>
+                          {isPending && (
+                            <span className="flex items-center gap-1 text-xs text-purple-200">
+                              <svg className="h-3 w-3 animate-spin" viewBox="0 0 24 24">
+                                <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" fill="none" />
+                                <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z" />
+                              </svg>
+                              Sending
+                            </span>
+                          )}
+                        </div>
                       </div>
                     </div>
                   </div>
-                </div>
-              )
-            })}
-            <div ref={messagesEndRef} />
-          </>
-        )}
+                )
+              })}
+              <div ref={messagesEndRef} />
+            </>
+          )}
+        </div>
       </div>
 
       <form onSubmit={handleSendMessage} className="p-4 bg-white border-t border-gray-200">
