@@ -217,12 +217,12 @@ export default function VacancyCard({
       {/* Actions */}
       <div className="flex items-center gap-2 pt-4 border-t border-gray-200">
         {hasApplied ? (
-          <Button
+          <button
             disabled
-            className="flex-1 bg-purple-100 text-purple-600 border border-purple-200 cursor-not-allowed font-semibold"
+            className="flex-1 px-4 py-2 bg-purple-100 text-purple-600 border border-purple-200 rounded-lg cursor-not-allowed font-semibold min-h-[44px]"
           >
             ✓ Applied
-          </Button>
+          </button>
         ) : onApply ? (
           <Button
             onClick={handleApplyClick}
