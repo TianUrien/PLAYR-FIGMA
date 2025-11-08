@@ -2,7 +2,8 @@ import { useEffect, useState, useRef } from 'react'
 import { useNavigate, useLocation } from 'react-router-dom'
 import { Users, Briefcase, MessageCircle, LayoutDashboard, Settings, LogOut } from 'lucide-react'
 import { useAuthStore } from '@/lib/auth'
-import { Avatar } from '@/components'
+import { Avatar, NotificationBadge } from '@/components'
+import { useUnreadMessages } from '@/hooks/useUnreadMessages'
 
 interface NavItem {
   id: string
@@ -15,6 +16,7 @@ export default function MobileBottomNav() {
   const navigate = useNavigate()
   const location = useLocation()
   const { profile, user, signOut } = useAuthStore()
+  const { count: unreadCount } = useUnreadMessages()
   const [isKeyboardOpen, setIsKeyboardOpen] = useState(false)
   const [isHidden, setIsHidden] = useState(false)
   const [profileMenuOpen, setProfileMenuOpen] = useState(false)
@@ -126,10 +128,7 @@ export default function MobileBottomNav() {
 
       {/* Bottom Navigation */}
       <nav 
-        className="md:hidden fixed bottom-0 left-0 right-0 z-40 bg-white/95 backdrop-blur-lg border-t border-gray-200/50 shadow-lg"
-        style={{
-          paddingBottom: 'max(env(safe-area-inset-bottom), 0.5rem)',
-        }}
+        className="md:hidden fixed bottom-0 left-0 right-0 z-40 bg-white/95 backdrop-blur-lg border-t border-gray-200/50 shadow-lg pb-[max(env(safe-area-inset-bottom),0.5rem)]"
       >
         <div className="flex items-center justify-around px-2 pt-2">
           {navItems.map((item) => {
@@ -156,6 +155,9 @@ export default function MobileBottomNav() {
                       active ? 'stroke-[2.5]' : 'stroke-[2]'
                     }`}
                   />
+                  {item.id === 'messages' && (
+                    <NotificationBadge count={unreadCount} />
+                  )}
                   {active && (
                     <div className="absolute inset-0 bg-gradient-to-r from-[#6366f1] to-[#8b5cf6] opacity-20 rounded-full blur-md" />
                   )}
@@ -181,7 +183,6 @@ export default function MobileBottomNav() {
                   : 'text-gray-600 active:bg-gray-100'
               }`}
               aria-label="Profile menu"
-              aria-expanded={profileMenuOpen}
               aria-haspopup="true"
             >
               <div className={`relative mb-0.5 transition-transform duration-200 ${

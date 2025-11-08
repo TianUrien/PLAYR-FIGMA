@@ -1,117 +1,23 @@
-import { useState, useEffect, useRef, useCallback } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { MessageCircle, LogOut, Users, Briefcase, LayoutDashboard, Settings } from 'lucide-react'
 import { Avatar, NotificationBadge } from '@/components'
 import { useAuthStore } from '@/lib/auth'
-import { supabase } from '@/lib/supabase'
-import { monitor } from '@/lib/monitor'
-import { requestCache, generateCacheKey } from '@/lib/requestCache'
+import { useUnreadMessages } from '@/hooks/useUnreadMessages'
 
 export default function Header() {
   const navigate = useNavigate()
   const { user, profile, signOut } = useAuthStore()
-  const [unreadCount, setUnreadCount] = useState(0)
+  const { count: unreadCount } = useUnreadMessages()
   const [dropdownOpen, setDropdownOpen] = useState(false)
   const dropdownRef = useRef<HTMLDivElement>(null)
-
-  // Fetch unread message count
-  const fetchUnreadCount = useCallback(async () => {
-    if (!user?.id) return
-
-    const cacheKey = generateCacheKey('unread_count', { userId: user.id })
-    console.log('🔍 [Header] Fetching unread count...', { cacheKey })
-
-    await monitor.measure('fetch_unread_count', async () => {
-      const count = await requestCache.dedupe(
-        cacheKey,
-        async () => {
-          console.log('📡 [Header] Querying user_unread_counts_secure view...')
-          // Use regular view for instant unread count (10-50ms with indexes)
-          const { data, error } = await supabase
-            .from('user_unread_counts_secure')
-            .select('unread_count')
-            .maybeSingle()
-
-          if (error) {
-            console.error('❌ [Header] Failed to fetch unread count:', error)
-            return 0
-          }
-
-          const unreadCount = data?.unread_count || 0
-          console.log('✅ [Header] Fetched unread count from DB:', unreadCount)
-          return unreadCount
-        },
-        5000 // 🔥 FIX #3: Reduced from 60s to 5s for faster recovery
-      )
-
-      console.log('📊 [Header] Setting unread count state:', count)
-      setUnreadCount(count)
-    }, { userId: user.id })
-  }, [user?.id]) // Only depend on user.id to prevent unnecessary recreations
-
-  // 🔥 FIX #4: Export method for optimistic badge updates
-  // This allows ChatWindow to instantly decrement the badge
-  useEffect(() => {
-    if (typeof window !== 'undefined') {
-      window.__updateUnreadBadge = (delta: number) => {
-        console.log(`🎯 [Header] __updateUnreadBadge called with delta: ${delta}`)
-        setUnreadCount(prev => {
-          const newCount = Math.max(0, prev + delta)
-          console.log(`🎯 [Header] Badge count: ${prev} → ${newCount}`)
-          return newCount
-        })
-      }
-      
-      // Add function to force refresh badge from database
-      window.__refreshUnreadBadge = () => {
-        console.log('🔄 [Header] __refreshUnreadBadge called - forcing database refresh')
-        fetchUnreadCount()
-      }
-      
-      console.log('✅ [Header] window.__updateUnreadBadge registered')
-      console.log('✅ [Header] window.__refreshUnreadBadge registered')
-    }
-    return () => {
-      if (typeof window !== 'undefined') {
-        delete window.__updateUnreadBadge
-        delete window.__refreshUnreadBadge
-        console.log('🗑️ [Header] window.__updateUnreadBadge cleaned up')
-        console.log('🗑️ [Header] window.__refreshUnreadBadge cleaned up')
-      }
-    }
-  }, [fetchUnreadCount])
-
-  useEffect(() => {
-    if (!user?.id) return
-    
-    fetchUnreadCount()
-    
-    // Set up real-time subscription for message updates
-    const channel = supabase
-      .channel('unread-messages')
-      .on(
-        'postgres_changes',
-        {
-          event: '*',
-          schema: 'public',
-          table: 'messages'
-        },
-        (payload) => {
-          console.log('🔔 [Header] Real-time message event:', payload.eventType)
-          // Add a small delay to ensure DB transaction is committed
-          // This prevents fetching stale data due to race conditions
-          setTimeout(() => {
-            console.log('⏰ [Header] Fetching unread count after DB sync delay')
-            fetchUnreadCount()
-          }, 250) // 250ms delay for DB sync
-        }
-      )
-      .subscribe()
-
-    return () => {
-      supabase.removeChannel(channel)
-    }
-  }, [user?.id, fetchUnreadCount]) // Fixed: Use user?.id instead of user object
+  const fullName = profile?.full_name ?? ''
+  const profileInitials = fullName
+    .trim()
+    .split(' ')
+    .filter(Boolean)
+    .map(part => part[0])
+    .join('') || '?'
 
   // Close dropdown when clicking outside
   useEffect(() => {
@@ -149,9 +55,7 @@ export default function Header() {
               />
             </button>
             
-            <span 
-              className="hidden md:inline-block px-3 py-1 rounded-full text-xs font-medium text-white bg-[#ff9500]"
-            >
+            <span className="hidden md:inline-block px-3 py-1 rounded-full text-xs font-medium text-white bg-[#ff9500]">
               The Home of Field Hockey.
             </span>
           </div>
@@ -204,15 +108,14 @@ export default function Header() {
                     onClick={() => setDropdownOpen(!dropdownOpen)}
                     className="flex items-center gap-2 hover:opacity-80 transition-opacity"
                     aria-label="Open user menu"
-                    aria-expanded={dropdownOpen}
                     aria-haspopup="true"
                   >
                     <Avatar
                       src={profile.avatar_url}
-                      initials={profile.full_name.split(' ').map(n => n[0]).join('')}
+                      initials={profileInitials}
                       size="sm"
                     />
-                    <span className="text-sm font-medium text-gray-700">{profile.full_name}</span>
+                    <span className="text-sm font-medium text-gray-700">{fullName || 'Profile'}</span>
                   </button>
 
                   {/* Dropdown Menu */}
