@@ -219,7 +219,7 @@ export default function VacancyCard({
         {hasApplied ? (
           <Button
             disabled
-            className="flex-1 bg-gray-100 text-gray-500 cursor-not-allowed"
+            className="flex-1 bg-green-50 text-green-700 border border-green-200 cursor-not-allowed font-medium"
           >
             ✓ Applied
           </Button>
