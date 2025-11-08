@@ -205,22 +205,23 @@ export default function MediaTab({ profileId, readOnly = false }: MediaTabProps)
 
   return (
     <div className="space-y-8">
-      {/* Highlight Video Section */}
-      <div>
-        <div className="flex items-center justify-between mb-4">
-          <div>
-            <h2 className="text-xl font-semibold text-gray-900">Highlight Video</h2>
-            <p className="text-sm text-gray-600">Showcase your best moments and skills</p>
+      {/* Highlight Video Section - Only show for players */}
+      {displayProfile?.role === 'player' && (
+        <div>
+          <div className="flex items-center justify-between mb-4">
+            <div>
+              <h2 className="text-xl font-semibold text-gray-900">Highlight Video</h2>
+              <p className="text-sm text-gray-600">Showcase your best moments and skills</p>
+            </div>
+            {!readOnly && displayProfile?.highlight_video_url && (
+              <Button
+                variant="outline"
+                onClick={() => setShowAddVideoModal(true)}
+              >
+                Manage
+              </Button>
+            )}
           </div>
-          {!readOnly && displayProfile?.highlight_video_url && (
-            <Button
-              variant="outline"
-              onClick={() => setShowAddVideoModal(true)}
-            >
-              Manage
-            </Button>
-          )}
-        </div>
 
         {displayProfile?.highlight_video_url ? (
           <div className="relative">
@@ -274,7 +275,8 @@ export default function MediaTab({ profileId, readOnly = false }: MediaTabProps)
             )}
           </div>
         )}
-      </div>
+        </div>
+      )}
 
       {/* Gallery Section */}
       <div>
