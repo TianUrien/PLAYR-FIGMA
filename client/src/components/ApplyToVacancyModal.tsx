@@ -24,11 +24,9 @@ export default function ApplyToVacancyModal({
 }: ApplyToVacancyModalProps) {
   const { user } = useAuthStore()
   const { addToast } = useToastStore()
-  const [coverLetter, setCoverLetter] = useState('')
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const dialogRef = useRef<HTMLDivElement>(null)
-  const textareaRef = useRef<HTMLTextAreaElement | null>(null)
   const titleId = useId()
   const descriptionId = useId()
 
@@ -37,11 +35,10 @@ export default function ApplyToVacancyModal({
       return
     }
     onClose()
-    setCoverLetter('')
     setError(null)
   }, [isSubmitting, onClose])
 
-  useFocusTrap({ containerRef: dialogRef, isActive: isOpen, initialFocusRef: textareaRef })
+  useFocusTrap({ containerRef: dialogRef, isActive: isOpen })
 
   useEffect(() => {
     if (!isOpen) {
@@ -91,7 +88,6 @@ export default function ApplyToVacancyModal({
         .insert({
           vacancy_id: vacancy.id,
           player_id: user.id,
-          cover_letter: coverLetter.trim() || null,
           status: 'pending',
         } as never)
 
@@ -123,7 +119,6 @@ export default function ApplyToVacancyModal({
         // Success! Application created
         addToast('Application submitted successfully!', 'success')
       }
-      setCoverLetter('')
     } catch (err) {
       // Network error - UI already updated
       console.error('❌ Unexpected error:', err)
@@ -181,26 +176,6 @@ export default function ApplyToVacancyModal({
               <span className="text-sm font-medium text-gray-700">Type:</span>
               <span className="text-sm text-gray-900 capitalize">{vacancy.opportunity_type}</span>
             </div>
-          </div>
-
-          {/* Cover Letter */}
-          <div>
-            <label htmlFor="coverLetter" className="block text-sm font-medium text-gray-700 mb-2">
-              Cover Letter <span className="text-gray-400">(Optional)</span>
-            </label>
-            <textarea
-              ref={textareaRef}
-              id="coverLetter"
-              value={coverLetter}
-              onChange={(e) => setCoverLetter(e.target.value)}
-              placeholder="Tell the club why you're interested in this position and what you can bring to the team..."
-              rows={8}
-              className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent resize-none"
-              disabled={isSubmitting}
-            />
-            <p className="mt-2 text-xs text-gray-500">
-              {coverLetter.length} characters
-            </p>
           </div>
 
           {/* Error Message */}
