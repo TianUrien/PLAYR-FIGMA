@@ -147,7 +147,13 @@ export default function VacancyDetailView({
                   </span>
                   {vacancy.opportunity_type === 'player' && vacancy.gender && (
                     <span className="inline-flex h-9 items-center gap-1.5 rounded-full px-3 text-sm font-medium bg-pink-100 text-pink-700">
-                      <span className="flex h-5 w-5 items-center justify-center text-base leading-none">{vacancy.gender === 'Men' ? '♂' : '♀'}</span>
+                      <span
+                        className={`flex h-5 w-5 items-center justify-center text-base leading-none ${
+                          vacancy.gender === 'Men' ? 'text-blue-600' : 'text-pink-600'
+                        }`}
+                      >
+                        {vacancy.gender === 'Men' ? '♂' : '♀'}
+                      </span>
                       <span className="leading-none">{formatGender(vacancy.gender)}</span>
                     </span>
                   )}
