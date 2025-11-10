@@ -9,6 +9,9 @@ import { optimizeImage, validateImage } from '@/lib/imageOptimization'
 import { logger } from '@/lib/logger'
 import { invalidateProfile } from '@/lib/profile'
 import { useToastStore } from '@/lib/toast'
+import ConfirmActionModal from './ConfirmActionModal'
+import MediaLightbox from './MediaLightbox'
+import Skeleton from './Skeleton'
 
 interface MediaTabProps {
   profileId?: string
@@ -19,6 +22,7 @@ export default function MediaTab({ profileId, readOnly = false }: MediaTabProps)
   const { user, profile: authProfile } = useAuthStore()
   const targetUserId = profileId || user?.id
   const { addToast } = useToastStore()
+  const [isLoadingProfile, setIsLoadingProfile] = useState(true)
   const [targetProfile, setTargetProfile] = useState<Profile | null>(null)
   const [showAddVideoModal, setShowAddVideoModal] = useState(false)
   const [galleryPhotos, setGalleryPhotos] = useState<GalleryPhoto[]>([])
@@ -26,22 +30,35 @@ export default function MediaTab({ profileId, readOnly = false }: MediaTabProps)
   const [isUploading, setIsUploading] = useState(false)
   const [deletingPhotoId, setDeletingPhotoId] = useState<string | null>(null)
   const [deletingVideo, setDeletingVideo] = useState(false)
+  const [photoPendingDelete, setPhotoPendingDelete] = useState<GalleryPhoto | null>(null)
+  const [showVideoDeleteModal, setShowVideoDeleteModal] = useState(false)
+  const [previewPhoto, setPreviewPhoto] = useState<GalleryPhoto | null>(null)
 
   // Use the target profile if viewing someone else, otherwise use auth profile
   const displayProfile = targetProfile || authProfile
+  const isPlayerProfile = displayProfile?.role === 'player'
 
   // Fetch the profile data for the user being viewed
   useEffect(() => {
     const fetchTargetProfile = async () => {
-      if (!targetUserId) return
-      
-      // If viewing our own profile, use auth profile
-      if (targetUserId === user?.id) {
-        setTargetProfile(authProfile)
+      if (!targetUserId) {
+        setTargetProfile(null)
+        setIsLoadingProfile(false)
         return
       }
 
-      // Otherwise fetch the target user's profile
+      if (targetUserId === user?.id) {
+        if (authProfile) {
+          setTargetProfile(authProfile)
+          setIsLoadingProfile(false)
+        } else {
+          setIsLoadingProfile(true)
+        }
+        return
+      }
+
+      setIsLoadingProfile(true)
+
       try {
         const { data, error } = await supabase
           .from('profiles')
@@ -53,6 +70,9 @@ export default function MediaTab({ profileId, readOnly = false }: MediaTabProps)
         setTargetProfile(data)
       } catch (error) {
         console.error('Error fetching target profile:', error)
+        setTargetProfile(null)
+      } finally {
+        setIsLoadingProfile(false)
       }
     }
 
@@ -150,43 +170,46 @@ export default function MediaTab({ profileId, readOnly = false }: MediaTabProps)
     }
   }
 
-  const handleDeletePhoto = async (photo: GalleryPhoto) => {
-    if (!confirm('Are you sure you want to delete this photo?') || deletingPhotoId) return
+  const requestPhotoDelete = (photo: GalleryPhoto) => {
+    if (deletingPhotoId) return
+    setPhotoPendingDelete(photo)
+  }
 
-    setDeletingPhotoId(photo.id)
+  const confirmPhotoDelete = async () => {
+    if (!photoPendingDelete) return
+
+    setDeletingPhotoId(photoPendingDelete.id)
     try {
-      // Extract file path from URL
-      const urlParts = photo.photo_url.split('/gallery/')
+      const urlParts = photoPendingDelete.photo_url.split('/gallery/')
       if (urlParts.length < 2) throw new Error('Invalid photo URL')
       const filePath = urlParts[1]
 
-      // Delete from storage
       const { error: storageError } = await supabase.storage
         .from('gallery')
         .remove([filePath])
 
       if (storageError) throw storageError
 
-      // Delete from database
       const { error: dbError } = await supabase
         .from('gallery_photos')
         .delete()
-        .eq('id', photo.id)
+        .eq('id', photoPendingDelete.id)
 
       if (dbError) throw dbError
 
-      // Update local state
-      setGalleryPhotos(prev => prev.filter(p => p.id !== photo.id))
+      setGalleryPhotos(prev => prev.filter(p => p.id !== photoPendingDelete.id))
+      addToast('Photo removed from gallery.', 'success')
     } catch (error) {
       console.error('Error deleting photo:', error)
       addToast('Failed to delete photo. Please try again.', 'error')
     } finally {
       setDeletingPhotoId(null)
+      setPhotoPendingDelete(null)
     }
   }
 
-  const handleDeleteVideo = async () => {
-    if (!user || !confirm('Are you sure you want to remove your highlight video?') || deletingVideo) return
+  const confirmVideoDelete = async () => {
+    if (!user || deletingVideo) return
 
     setDeletingVideo(true)
     try {
@@ -197,7 +220,10 @@ export default function MediaTab({ profileId, readOnly = false }: MediaTabProps)
 
       if (error) throw error
 
+      setTargetProfile(prev => (prev ? { ...prev, highlight_video_url: null } : prev))
       await invalidateProfile({ userId: user.id, reason: 'highlight-video-removed' })
+      addToast('Highlight video removed.', 'success')
+      setShowVideoDeleteModal(false)
     } catch (error) {
       console.error('Error deleting video:', error)
       addToast('Failed to remove video. Please try again.', 'error')
@@ -209,9 +235,9 @@ export default function MediaTab({ profileId, readOnly = false }: MediaTabProps)
   return (
     <div className="space-y-8">
       {/* Highlight Video Section - Only show for players */}
-      {displayProfile?.role === 'player' && (
+      {isLoadingProfile || isPlayerProfile ? (
         <div>
-          <div className="flex items-center justify-between mb-4">
+          <div className="mb-4 flex items-center justify-between">
             <div>
               <h2 className="text-xl font-semibold text-gray-900">Highlight Video</h2>
               <p className="text-sm text-gray-600">Showcase your best moments and skills</p>
@@ -226,60 +252,58 @@ export default function MediaTab({ profileId, readOnly = false }: MediaTabProps)
             )}
           </div>
 
-        {displayProfile?.highlight_video_url ? (
-          <div className="relative">
-            <VideoEmbed url={displayProfile.highlight_video_url} />
-            {!readOnly && (
-              <button
-                onClick={handleDeleteVideo}
-                disabled={deletingVideo}
-                className="absolute top-4 right-4 p-2 bg-red-500 hover:bg-red-600 text-white rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
-                title="Remove video"
-                aria-label="Remove video"
-              >
-                <Trash2 className="w-4 h-4" />
-              </button>
-            )}
-          </div>
-        ) : (
-          <div className="border-2 border-dashed border-gray-300 rounded-xl p-12 text-center">
-            <div className="flex justify-center mb-4">
-              <div className="w-20 h-20 bg-gradient-to-br from-indigo-500 to-purple-600 rounded-full flex items-center justify-center">
-                <Video className="w-10 h-10 text-white" />
-              </div>
+          {isLoadingProfile ? (
+            <div className="space-y-4">
+              <Skeleton className="aspect-video w-full" variant="rectangular" />
+              <Skeleton className="h-10 w-40" />
             </div>
-            <h3 className="text-lg font-semibold text-gray-900 mb-2">No Highlight Video Yet</h3>
-            <p className="text-gray-600 mb-6">
-              {readOnly 
-                ? 'This player hasn\'t added a highlight video yet' 
-                : 'Add a video link from YouTube, Vimeo, or Google Drive to showcase your skills'
-              }
-            </p>
-            {!readOnly && (
-              <div className="flex items-center justify-center gap-3">
-                <Button
-                  onClick={() => setShowAddVideoModal(true)}
-                  className="flex items-center gap-2"
+          ) : displayProfile?.highlight_video_url ? (
+            <div className="relative">
+              <VideoEmbed url={displayProfile.highlight_video_url} />
+              {!readOnly && (
+                <button
+                  onClick={() => setShowVideoDeleteModal(true)}
+                  disabled={deletingVideo}
+                  className="absolute right-4 top-4 rounded-lg bg-red-500 p-2 text-white transition-colors hover:bg-red-600 disabled:cursor-not-allowed disabled:opacity-50"
+                  title="Remove video"
+                  aria-label="Remove video"
+                  type="button"
                 >
-                  <Upload className="w-4 h-4" />
-                  Add Video Link
-                </Button>
-                {displayProfile?.role !== 'player' && (
+                  <Trash2 className="h-4 w-4" />
+                </button>
+              )}
+            </div>
+          ) : (
+            <div className="rounded-xl border-2 border-dashed border-gray-300 p-8 text-center sm:p-12">
+              <div className="mb-4 flex justify-center">
+                <div className="flex h-20 w-20 items-center justify-center rounded-full bg-gradient-to-br from-indigo-500 to-purple-600">
+                  <Video className="h-10 w-10 text-white" />
+                </div>
+              </div>
+              <h3 className="mb-2 text-lg font-semibold text-gray-900">No Highlight Video Yet</h3>
+              <p className="mb-6 text-gray-600">
+                {readOnly
+                  ? 'This player has not added a highlight video yet.'
+                  : 'Drop in your highlight reel so coaches can evaluate your skills faster.'}
+              </p>
+              {!readOnly && (
+                <div className="flex flex-col items-center justify-center gap-3 sm:flex-row">
                   <Button
-                    variant="outline"
-                    disabled
+                    onClick={() => setShowAddVideoModal(true)}
                     className="flex items-center gap-2"
                   >
-                    <Upload className="w-4 h-4" />
-                    Upload Video
+                    <Upload className="h-4 w-4" />
+                    Add Video Link
                   </Button>
-                )}
-              </div>
-            )}
-          </div>
-        )}
+                  <p className="max-w-xs text-center text-xs text-gray-500">
+                    Uploading files directly is coming soon. For now, paste a share link from YouTube, Vimeo, or Google Drive.
+                  </p>
+                </div>
+              )}
+            </div>
+          )}
         </div>
-      )}
+      ) : null}
 
       {/* Gallery Section */}
       <div>
@@ -307,11 +331,15 @@ export default function MediaTab({ profileId, readOnly = false }: MediaTabProps)
         </div>
 
         {isLoadingPhotos ? (
-          <div className="text-center py-12 text-gray-500">Loading gallery...</div>
+          <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-4">
+            {Array.from({ length: 6 }).map((_, index) => (
+              <Skeleton key={index} className="aspect-[3/4] w-full" variant="rectangular" />
+            ))}
+          </div>
         ) : galleryPhotos.length === 0 ? (
-          <div className="border-2 border-dashed border-gray-300 rounded-xl p-12 text-center">
-            <p className="text-gray-600 mb-4">
-              {readOnly ? 'No photos in gallery yet' : 'No photos yet. Start building your gallery!'}
+          <div className="rounded-xl border-2 border-dashed border-gray-300 p-8 text-center sm:p-12">
+            <p className="mb-4 text-gray-600">
+              {readOnly ? 'No photos in gallery yet.' : 'No photos yet. Start building your gallery!'}
             </p>
             {!readOnly && (
               <label className="cursor-pointer">
@@ -322,32 +350,39 @@ export default function MediaTab({ profileId, readOnly = false }: MediaTabProps)
                   onChange={handlePhotoUpload}
                   className="hidden"
                 />
-                <div className="inline-flex items-center gap-2 px-4 py-2 bg-playr-primary text-white rounded-lg hover:bg-playr-primary/90 transition-all font-semibold mx-auto">
-                  <Plus className="w-4 h-4" />
+                <div className="mx-auto inline-flex items-center gap-2 rounded-lg bg-playr-primary px-4 py-2 font-semibold text-white transition-all hover:bg-playr-primary/90">
+                  <Plus className="h-4 w-4" />
                   Add Photo
                 </div>
               </label>
             )}
           </div>
         ) : (
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+          <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-4">
             {galleryPhotos.map((photo) => (
-              <div key={photo.id} className="relative group aspect-square">
+              <div key={photo.id} className="group relative aspect-[3/4] overflow-hidden rounded-lg">
                 <img
                   src={photo.photo_url}
                   alt="Gallery"
-                  className="w-full h-full object-cover rounded-lg"
+                  className="h-full w-full object-cover"
+                />
+                <button
+                  onClick={() => setPreviewPhoto(photo)}
+                  className="absolute inset-0 z-10 rounded-lg bg-black/0 opacity-0 transition-all focus-visible:ring-2 focus-visible:ring-white group-hover:bg-black/10 group-hover:opacity-100"
+                  aria-label="View photo"
+                  type="button"
                 />
                 {!readOnly && (
-                  <div className="absolute inset-0 bg-black bg-opacity-0 group-hover:bg-opacity-40 transition-all rounded-lg flex items-center justify-center">
+                  <div className="pointer-events-none absolute inset-0 z-20 flex items-center justify-center rounded-lg bg-black bg-opacity-0 transition-all group-hover:bg-opacity-40">
                     <button
-                      onClick={() => handleDeletePhoto(photo)}
+                      onClick={() => requestPhotoDelete(photo)}
                       disabled={deletingPhotoId === photo.id}
-                      className="opacity-0 group-hover:opacity-100 p-3 bg-red-500 hover:bg-red-600 text-white rounded-full transition-all transform scale-90 group-hover:scale-100 disabled:opacity-50 disabled:cursor-not-allowed"
+                      className="pointer-events-auto opacity-0 group-hover:opacity-100 rounded-full bg-red-500 p-3 text-white transition-all hover:bg-red-600 focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:ring-red-600 disabled:cursor-not-allowed disabled:opacity-50"
                       title="Delete photo"
                       aria-label="Delete photo"
+                      type="button"
                     >
-                      <Trash2 className="w-5 h-5" />
+                      <Trash2 className="h-5 w-5" />
                     </button>
                   </div>
                 )}
@@ -363,6 +398,45 @@ export default function MediaTab({ profileId, readOnly = false }: MediaTabProps)
         onClose={() => setShowAddVideoModal(false)}
         currentVideoUrl={displayProfile?.highlight_video_url || ''}
       />
+
+      <ConfirmActionModal
+        isOpen={Boolean(photoPendingDelete)}
+        onClose={() => setPhotoPendingDelete(null)}
+        onConfirm={confirmPhotoDelete}
+        confirmLabel="Delete Photo"
+        confirmTone="danger"
+        confirmLoading={Boolean(deletingPhotoId)}
+        loadingLabel="Deleting..."
+        title="Remove photo from gallery?"
+        description="This will permanently delete the photo from your media gallery."
+        icon={<Trash2 className="h-6 w-6" />}
+        body={photoPendingDelete ? (
+          <div className="space-y-3">
+            <p>Once deleted, teammates and coaches will no longer see this image on your profile.</p>
+            <img
+              src={photoPendingDelete.photo_url}
+              alt="Photo scheduled for deletion"
+              className="h-48 w-full rounded-lg object-cover"
+              loading="lazy"
+            />
+          </div>
+        ) : undefined}
+      />
+
+      <ConfirmActionModal
+        isOpen={showVideoDeleteModal}
+        onClose={() => setShowVideoDeleteModal(false)}
+        onConfirm={confirmVideoDelete}
+        confirmLabel="Remove Video"
+        confirmTone="danger"
+        confirmLoading={deletingVideo}
+        loadingLabel="Removing..."
+        title="Remove highlight video?"
+        description="Your profile will no longer display a highlight reel until you add a new link."
+        icon={<Video className="h-6 w-6" />}
+      />
+
+      <MediaLightbox photo={previewPhoto} onClose={() => setPreviewPhoto(null)} />
     </div>
   )
 }

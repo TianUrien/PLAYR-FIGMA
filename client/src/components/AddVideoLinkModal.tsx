@@ -168,6 +168,9 @@ export default function AddVideoLinkModal({ isOpen, onClose, currentVideoUrl }: 
               icon={<LinkIcon className="w-5 h-5" />}
               disabled={isLoading}
             />
+            <p className="mt-2 text-xs text-gray-500">
+              Paste the full share link from YouTube, Vimeo, or Google Drive. We will normalize the URL automatically before saving.
+            </p>
             {error && (
               <p className="mt-2 text-sm text-red-600">{error}</p>
             )}
@@ -182,13 +185,11 @@ export default function AddVideoLinkModal({ isOpen, onClose, currentVideoUrl }: 
             </div>
           )}
 
-          <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
-            <p className="text-sm font-medium text-blue-900 mb-2">Supported platforms:</p>
-            <ul className="text-sm text-blue-700 space-y-1">
-              <li>• YouTube (youtube.com, youtu.be)</li>
-              <li>• Vimeo (vimeo.com)</li>
-              <li>• Google Drive (drive.google.com)</li>
-            </ul>
+          <div className="rounded-lg border border-blue-200 bg-blue-50 p-4">
+            <p className="text-sm font-medium text-blue-900">Supported platforms</p>
+            <p className="mt-1 text-sm text-blue-700">
+              YouTube (`youtube.com`, `youtu.be`), Vimeo (`vimeo.com`), and Google Drive (`drive.google.com`). If your link includes splash page parameters we will clean them up.
+            </p>
           </div>
         </div>
 
