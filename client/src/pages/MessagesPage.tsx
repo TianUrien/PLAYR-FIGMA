@@ -10,6 +10,7 @@ import { ConversationSkeleton } from '@/components/Skeleton'
 import { requestCache } from '@/lib/requestCache'
 import { monitor } from '@/lib/monitor'
 import { logger } from '@/lib/logger'
+import { useMediaQuery } from '@/hooks/useMediaQuery'
 
 interface Conversation {
   id: string
@@ -42,6 +43,7 @@ export default function MessagesPage() {
   const [selectedConversationId, setSelectedConversationId] = useState<string | null>(null)
   const [searchQuery, setSearchQuery] = useState('')
   const [loading, setLoading] = useState(true)
+  const isMobile = useMediaQuery('(max-width: 767px)')
 
   // Set selected conversation from URL parameter
   useEffect(() => {
@@ -335,6 +337,7 @@ export default function MessagesPage() {
 
   const selectedConversation = combinedConversations.find((conv) => conv.id === selectedConversationId)
   const hasActiveConversation = Boolean(selectedConversation)
+  const showImmersiveConversation = Boolean(isMobile && selectedConversation)
 
   const handleSelectConversation = useCallback(
     (conversationId: string) => {
@@ -444,6 +447,23 @@ export default function MessagesPage() {
     [user?.id]
   )
 
+  if (showImmersiveConversation && selectedConversation) {
+    return (
+      <div className="flex min-h-screen flex-col bg-gray-50">
+        <div className="flex-1 flex">
+          <ChatWindow
+            conversation={selectedConversation}
+            currentUserId={user?.id || ''}
+            onBack={handleBackToList}
+            onMessageSent={() => {}}
+            onConversationCreated={handleConversationCreated}
+            onConversationRead={handleConversationRead}
+          />
+        </div>
+      </div>
+    )
+  }
+
   if (loading) {
     return (
       <div className="min-h-screen bg-gray-50">
@@ -483,11 +503,15 @@ export default function MessagesPage() {
     <div className="min-h-screen bg-gray-50">
       <Header />
 
-      <main className="max-w-7xl mx-auto px-4 pb-12 pt-[calc(var(--app-header-offset,0px)+1.5rem)] md:px-6">
+      <main className="mx-auto max-w-7xl px-4 pb-12 pt-[calc(var(--app-header-offset,0px)+1.5rem)] md:px-6">
         <div className="flex min-h-[calc(100vh-var(--app-header-offset,0px)-4rem)] flex-col overflow-hidden rounded-3xl border border-gray-100 bg-white shadow-sm">
           <div className="flex min-h-0 flex-1">
             {/* Left Column - Conversations List */}
-            <div className={`flex w-full flex-shrink-0 flex-col border-b border-gray-100 md:w-96 md:border-b-0 md:border-r ${hasActiveConversation ? 'hidden md:flex' : 'flex'}`}>
+            <div
+              className={`flex w-full flex-shrink-0 flex-col border-b border-gray-100 md:w-96 md:border-b-0 md:border-r ${
+                hasActiveConversation ? 'hidden md:flex' : 'flex'
+              }`}
+            >
               {/* Header */}
               <div className="p-4 border-b border-gray-200">
                 <h1 className="text-2xl font-bold text-gray-900 mb-4">Messages</h1>

@@ -83,9 +83,11 @@ export default function MobileBottomNav() {
   // Hide on certain routes (modals, auth pages)
   useEffect(() => {
     const hiddenRoutes = ['/', '/signup', '/login', '/complete-profile']
-    const shouldHide = hiddenRoutes.some(route => location.pathname === route)
+    const searchParams = new URLSearchParams(location.search)
+    const isImmersiveMessagesView = location.pathname.startsWith('/messages') && (searchParams.has('conversation') || searchParams.has('new'))
+    const shouldHide = hiddenRoutes.some(route => location.pathname === route) || isImmersiveMessagesView
     setIsHidden(shouldHide)
-  }, [location.pathname])
+  }, [location.pathname, location.search])
 
   // Close profile menu when clicking outside
   useEffect(() => {

@@ -8,6 +8,7 @@ import { logger } from '@/lib/logger'
 import { withRetry } from '@/lib/retry'
 import { requestCache, generateCacheKey } from '@/lib/requestCache'
 import { useToastStore } from '@/lib/toast'
+import { useMediaQuery } from '@/hooks/useMediaQuery'
 
 type NullableDate = string | null
 
@@ -57,6 +58,11 @@ export default function ChatWindow({ conversation, currentUserId, onBack, onMess
   const inputRef = useRef<HTMLTextAreaElement>(null)
   const messagesRef = useRef<Message[]>([])
   const { addToast } = useToastStore()
+  const isMobile = useMediaQuery('(max-width: 767px)')
+  const scrollContainerRef = useRef<HTMLDivElement>(null)
+  const shouldStickToBottomRef = useRef(true)
+  const initialScrollSyncPending = useRef(true)
+  const fallbackBaselineInnerHeightRef = useRef<number | null>(null)
 
   const syncMessagesState = useCallback(
     (next: Message[] | ((prev: Message[]) => Message[])) => {
@@ -190,6 +196,9 @@ export default function ChatWindow({ conversation, currentUserId, onBack, onMess
   )
 
   useEffect(() => {
+    shouldStickToBottomRef.current = true
+    initialScrollSyncPending.current = true
+
     if (!conversation.id || conversation.isPending) {
       setLoading(false)
       syncMessagesState([])
@@ -271,8 +280,165 @@ export default function ChatWindow({ conversation, currentUserId, onBack, onMess
   }, [conversation.id, conversation.isPending, currentUserId, markMessagesAsRead, syncMessagesState])
 
   useEffect(() => {
-    messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' })
-  }, [messages])
+    if (!isMobile || typeof window === 'undefined') {
+      return
+    }
+
+    const updateViewportInsets = () => {
+      if (window.visualViewport) {
+        const viewport = window.visualViewport
+        if (!viewport) {
+          return
+        }
+
+        const bottomInset = Math.max(0, window.innerHeight - viewport.height - viewport.offsetTop)
+        const rightInset = Math.max(0, window.innerWidth - (viewport.width + viewport.offsetLeft))
+        fallbackBaselineInnerHeightRef.current = window.innerHeight
+        document.documentElement.style.setProperty('--chat-safe-area-bottom', `${bottomInset}px`)
+        document.documentElement.style.setProperty('--chat-safe-area-right', `${rightInset}px`)
+        return
+      }
+
+      if (fallbackBaselineInnerHeightRef.current === null || window.innerHeight >= fallbackBaselineInnerHeightRef.current) {
+        fallbackBaselineInnerHeightRef.current = window.innerHeight
+        document.documentElement.style.setProperty('--chat-safe-area-bottom', '0px')
+      } else {
+        const bottomInset = Math.max(0, fallbackBaselineInnerHeightRef.current - window.innerHeight)
+        document.documentElement.style.setProperty('--chat-safe-area-bottom', `${bottomInset}px`)
+      }
+
+      document.documentElement.style.setProperty('--chat-safe-area-right', '0px')
+    }
+
+    updateViewportInsets()
+
+    if (window.visualViewport) {
+      window.visualViewport.addEventListener('resize', updateViewportInsets)
+      window.visualViewport.addEventListener('scroll', updateViewportInsets)
+
+      return () => {
+        window.visualViewport?.removeEventListener('resize', updateViewportInsets)
+        window.visualViewport?.removeEventListener('scroll', updateViewportInsets)
+        document.documentElement.style.removeProperty('--chat-safe-area-bottom')
+        document.documentElement.style.removeProperty('--chat-safe-area-right')
+        fallbackBaselineInnerHeightRef.current = null
+      }
+    }
+
+    window.addEventListener('resize', updateViewportInsets)
+    window.addEventListener('orientationchange', updateViewportInsets)
+
+    return () => {
+      window.removeEventListener('resize', updateViewportInsets)
+      window.removeEventListener('orientationchange', updateViewportInsets)
+      document.documentElement.style.removeProperty('--chat-safe-area-bottom')
+      document.documentElement.style.removeProperty('--chat-safe-area-right')
+      fallbackBaselineInnerHeightRef.current = null
+    }
+  }, [isMobile])
+
+  useEffect(() => {
+    const updateComposerHeight = () => {
+      const composerElement = inputRef.current?.closest('[data-chat-composer="true"]') as HTMLElement | null
+      if (!composerElement) {
+        return
+      }
+      document.documentElement.style.setProperty('--chat-composer-height', `${composerElement.getBoundingClientRect().height}px`)
+      if (shouldStickToBottomRef.current && scrollContainerRef.current) {
+        scrollContainerRef.current.scrollTo({ top: scrollContainerRef.current.scrollHeight })
+      }
+    }
+
+    updateComposerHeight()
+
+    if (typeof ResizeObserver === 'undefined') {
+      window.addEventListener('resize', updateComposerHeight)
+      window.addEventListener('orientationchange', updateComposerHeight)
+
+      return () => {
+        window.removeEventListener('resize', updateComposerHeight)
+        window.removeEventListener('orientationchange', updateComposerHeight)
+        document.documentElement.style.removeProperty('--chat-composer-height')
+      }
+    }
+
+    const observer = new ResizeObserver(entries => {
+      for (const entry of entries) {
+        if (entry.target === inputRef.current?.closest('[data-chat-composer="true"]')) {
+          document.documentElement.style.setProperty('--chat-composer-height', `${entry.contentRect.height}px`)
+        }
+      }
+    })
+
+    const composerElement = inputRef.current?.closest('[data-chat-composer="true"]') as HTMLElement | null
+    if (composerElement) {
+      observer.observe(composerElement)
+    }
+
+    return () => {
+      observer.disconnect()
+      document.documentElement.style.removeProperty('--chat-composer-height')
+    }
+  }, [])
+
+  useEffect(() => {
+    const scrollEl = scrollContainerRef.current
+    if (!scrollEl) return
+
+    const handleScroll = () => {
+      const distanceFromBottom = scrollEl.scrollHeight - (scrollEl.scrollTop + scrollEl.clientHeight)
+      shouldStickToBottomRef.current = distanceFromBottom < 96
+    }
+
+    handleScroll()
+    scrollEl.addEventListener('scroll', handleScroll, { passive: true })
+
+    if (typeof ResizeObserver !== 'undefined') {
+      const observer = new ResizeObserver(() => {
+        if (shouldStickToBottomRef.current) {
+          scrollEl.scrollTo({ top: scrollEl.scrollHeight })
+          shouldStickToBottomRef.current = true
+        }
+      })
+      observer.observe(scrollEl)
+
+      return () => {
+        scrollEl.removeEventListener('scroll', handleScroll)
+        observer.disconnect()
+      }
+    }
+
+    return () => {
+      scrollEl.removeEventListener('scroll', handleScroll)
+    }
+  }, [conversation.id])
+
+  useEffect(() => {
+    if (!messages.length) {
+      return
+    }
+
+    const scrollEl = scrollContainerRef.current
+    const lastMessage = messages[messages.length - 1]
+    const shouldForceScroll = lastMessage?.sender_id === currentUserId
+
+    if (initialScrollSyncPending.current || shouldForceScroll || shouldStickToBottomRef.current) {
+      requestAnimationFrame(() => {
+        if (!scrollEl) {
+          messagesEndRef.current?.scrollIntoView({ behavior: 'auto' })
+          shouldStickToBottomRef.current = true
+          initialScrollSyncPending.current = false
+          return
+        }
+        scrollEl.scrollTo({
+          top: scrollEl.scrollHeight,
+          behavior: initialScrollSyncPending.current ? 'auto' : 'smooth',
+        })
+        shouldStickToBottomRef.current = true
+        initialScrollSyncPending.current = false
+      })
+    }
+  }, [messages, currentUserId])
 
   const handleSendMessage = async (e: React.FormEvent) => {
     e.preventDefault()
@@ -285,6 +451,7 @@ export default function ChatWindow({ conversation, currentUserId, onBack, onMess
     }
 
     setSending(true)
+    shouldStickToBottomRef.current = true
     const otherParticipantId =
       conversation.participant_one_id === currentUserId
         ? conversation.participant_two_id
@@ -478,8 +645,12 @@ export default function ChatWindow({ conversation, currentUserId, onBack, onMess
   }
 
   return (
-    <div className="flex h-full flex-col bg-gray-50">
-      <div className="sticky top-[var(--app-header-offset,0px)] z-30 flex flex-shrink-0 items-center gap-3 border-b border-gray-200 bg-white px-4 py-4 shadow-sm md:px-6">
+    <div className={`flex h-full w-full flex-col bg-gray-50 ${isMobile ? 'pb-[var(--chat-safe-area-bottom,0px)]' : ''}`}>
+      <div
+        className={`flex flex-shrink-0 items-center gap-3 border-b border-gray-200 bg-white pl-4 pr-[calc(1rem+var(--chat-safe-area-right,0px))] py-4 shadow-sm md:pl-6 md:pr-[calc(1.5rem+var(--chat-safe-area-right,0px))] ${
+          isMobile ? 'sticky top-0 z-40 pt-[calc(env(safe-area-inset-top)+1rem)]' : 'sticky top-[var(--app-header-offset,0px)] z-30'
+        }`}
+      >
         <button
           onClick={onBack}
           className="md:hidden rounded-lg p-2 transition-colors hover:bg-gray-100"
@@ -524,7 +695,14 @@ export default function ChatWindow({ conversation, currentUserId, onBack, onMess
         </div>
       </div>
 
-      <div className="flex-1 overflow-y-auto px-4 pb-24 pt-6 scroll-smooth md:px-6 md:pb-20">
+      <div
+        ref={scrollContainerRef}
+        className={`flex-1 overflow-y-auto pt-6 scroll-smooth pl-4 pr-[calc(1rem+var(--chat-safe-area-right,0px))] md:pl-6 md:pr-[calc(1.5rem+var(--chat-safe-area-right,0px))] ${
+          isMobile
+            ? 'pb-[calc(var(--chat-composer-height,72px)+var(--chat-safe-area-bottom,0px)+1rem)]'
+            : 'pb-24 md:pb-20'
+        }`}
+      >
         {messages.length === 0 ? (
           <div className="flex min-h-[240px] items-center justify-center text-center text-gray-500">
             No messages yet. Start the conversation!
@@ -580,7 +758,15 @@ export default function ChatWindow({ conversation, currentUserId, onBack, onMess
         )}
       </div>
 
-      <form onSubmit={handleSendMessage} className="flex-shrink-0 border-t border-gray-200 bg-white/95 px-4 py-4 backdrop-blur md:px-6">
+      <form
+        onSubmit={handleSendMessage}
+        data-chat-composer="true"
+        className={`flex-shrink-0 border-t border-gray-200 bg-white/95 pl-4 pr-[calc(1rem+var(--chat-safe-area-right,0px))] py-4 backdrop-blur md:pl-6 md:pr-[calc(1.5rem+var(--chat-safe-area-right,0px))] ${
+          isMobile
+            ? 'fixed bottom-0 left-0 right-0 z-40 shadow-lg pb-[calc(1rem+var(--chat-safe-area-bottom,0px))]'
+            : ''
+        }`}
+      >
         <div className="flex items-end gap-3 md:gap-4">
           <div className="relative flex-1">
             <textarea
