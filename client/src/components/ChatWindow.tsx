@@ -42,6 +42,7 @@ interface Conversation {
 
 const COMPOSER_MIN_HEIGHT = 48
 const COMPOSER_MAX_HEIGHT = 160
+const MESSAGES_PAGE_SIZE = 50
 
 interface ChatWindowProps {
   conversation: Conversation
@@ -70,6 +71,15 @@ export default function ChatWindow({ conversation, currentUserId, onBack, onMess
   const pendingUnreadRef = useRef(false)
   const textareaId = useId()
   const textareaCharCountId = `${textareaId}-counter`
+  const [hasMoreMessages, setHasMoreMessages] = useState(true)
+  const [isLoadingMore, setIsLoadingMore] = useState(false)
+  const oldestLoadedTimestampRef = useRef<string | null>(null)
+
+  useEffect(() => {
+    setHasMoreMessages(true)
+    setIsLoadingMore(false)
+    oldestLoadedTimestampRef.current = null
+  }, [conversation.id])
 
   const syncMessagesState = useCallback(
     (next: Message[] | ((prev: Message[]) => Message[])) => {
@@ -122,6 +132,7 @@ export default function ChatWindow({ conversation, currentUserId, onBack, onMess
   const fetchMessages = useCallback(async () => {
     if (!conversation.id || conversation.isPending) {
       syncMessagesState([])
+      setHasMoreMessages(false)
       setLoading(false)
       return [] as Message[]
     }
@@ -132,17 +143,21 @@ export default function ChatWindow({ conversation, currentUserId, onBack, onMess
         .from('messages')
         .select('*')
         .eq('conversation_id', conversation.id)
-        .order('sent_at', { ascending: true })
+        .order('sent_at', { ascending: false })
+        .limit(MESSAGES_PAGE_SIZE)
 
       if (error) throw error
 
-      const fetched = data ?? []
+      const fetched = (data ?? []).reverse()
       logger.debug('Fetched messages:', fetched)
       syncMessagesState(fetched)
+      oldestLoadedTimestampRef.current = fetched[0]?.sent_at ?? null
+      setHasMoreMessages((data ?? []).length === MESSAGES_PAGE_SIZE)
       return fetched
     } catch (error) {
       logger.error('Error fetching messages:', error)
       syncMessagesState([])
+      setHasMoreMessages(false)
       return [] as Message[]
     } finally {
       setLoading(false)
@@ -256,6 +271,79 @@ export default function ChatWindow({ conversation, currentUserId, onBack, onMess
       syncMessagesState
     ]
   )
+
+  const loadOlderMessages = useCallback(async () => {
+    if (!conversation.id || isLoadingMore || !hasMoreMessages) {
+      return
+    }
+
+    const oldestTimestamp = oldestLoadedTimestampRef.current
+    if (!oldestTimestamp) {
+      setHasMoreMessages(false)
+      return
+    }
+
+    const scrollEl = scrollContainerRef.current
+    const previousScrollHeight = scrollEl?.scrollHeight ?? 0
+    const previousScrollTop = scrollEl?.scrollTop ?? 0
+
+    setIsLoadingMore(true)
+
+    try {
+      const { data, error } = await supabase
+        .from('messages')
+        .select('*')
+        .eq('conversation_id', conversation.id)
+        .lt('sent_at', oldestTimestamp)
+        .order('sent_at', { ascending: false })
+        .limit(MESSAGES_PAGE_SIZE)
+
+      if (error) {
+        throw error
+      }
+
+      const fetched = data ?? []
+
+      if (!fetched.length) {
+        setHasMoreMessages(false)
+        return
+      }
+
+      const olderMessages = fetched.reverse()
+      oldestLoadedTimestampRef.current = olderMessages[0]?.sent_at ?? oldestTimestamp
+      setHasMoreMessages(fetched.length === MESSAGES_PAGE_SIZE)
+
+      syncMessagesState(prev => {
+        if (!olderMessages.length) {
+          return prev
+        }
+
+        const existingIds = new Set(prev.map(msg => msg.id))
+        const deduped = olderMessages.filter(msg => !existingIds.has(msg.id))
+
+        if (deduped.length === 0) {
+          return prev
+        }
+
+        return [...deduped, ...prev]
+      })
+
+      requestAnimationFrame(() => {
+        if (!scrollEl) {
+          return
+        }
+        const newScrollHeight = scrollEl.scrollHeight
+        const heightDelta = newScrollHeight - previousScrollHeight
+        if (heightDelta > 0) {
+          scrollEl.scrollTop = previousScrollTop + heightDelta
+        }
+      })
+    } catch (error) {
+      logger.error('Error loading older messages:', error)
+    } finally {
+      setIsLoadingMore(false)
+    }
+  }, [conversation.id, hasMoreMessages, isLoadingMore, syncMessagesState])
 
   const handleJumpToLatest = useCallback(() => {
     scrollToLatest('smooth')
@@ -484,6 +572,12 @@ export default function ChatWindow({ conversation, currentUserId, onBack, onMess
     if (!scrollEl) return
 
     const handleScroll = () => {
+      const container = scrollContainerRef.current
+
+      if (container && container.scrollTop < 120 && hasMoreMessages && !isLoadingMore) {
+        void loadOlderMessages()
+      }
+
       const atBottom = isViewerAtBottom()
       shouldStickToBottomRef.current = atBottom
 
@@ -522,7 +616,10 @@ export default function ChatWindow({ conversation, currentUserId, onBack, onMess
     }
   }, [
     conversation.id,
+    hasMoreMessages,
+    isLoadingMore,
     isViewerAtBottom,
+    loadOlderMessages,
     markMessagesAsRead,
     scrollToLatest,
     setShowNewMessagesIndicator,
@@ -759,7 +856,7 @@ export default function ChatWindow({ conversation, currentUserId, onBack, onMess
   }
 
   const canSend = newMessage.trim().length > 0
-  const shouldShowSendButton = canSend || sending
+  const isSendDisabled = !canSend || sending
 
   return (
     <div
@@ -820,7 +917,7 @@ export default function ChatWindow({ conversation, currentUserId, onBack, onMess
         ref={scrollContainerRef}
         className={`flex-1 min-h-0 overflow-y-auto overscroll-contain pt-6 pl-4 pr-[calc(1rem+var(--chat-safe-area-right,0px))] md:pl-6 md:pr-[calc(1.5rem+var(--chat-safe-area-right,0px))] ${
           isMobile
-            ? 'pb-[calc(var(--chat-composer-height,72px)+var(--chat-safe-area-bottom,0px)+1rem)]'
+            ? 'pb-[calc(var(--chat-composer-height,72px)+var(--chat-safe-area-bottom,0px)+0.75rem)]'
             : 'pb-24 md:pb-20'
         }`}
       >
@@ -830,6 +927,11 @@ export default function ChatWindow({ conversation, currentUserId, onBack, onMess
           </div>
         ) : (
           <>
+            {isLoadingMore && (
+              <div className="flex justify-center pb-4 text-xs font-medium uppercase tracking-wide text-gray-400">
+                Loading earlier messages…
+              </div>
+            )}
             <div className="flex flex-col gap-4">
               {messages.map((message, index) => {
                 const isMyMessage = message.sender_id === currentUserId
@@ -897,7 +999,7 @@ export default function ChatWindow({ conversation, currentUserId, onBack, onMess
         data-chat-composer="true"
         className={`flex-shrink-0 border-t border-gray-200 bg-white/95 pl-4 pr-[calc(1rem+var(--chat-safe-area-right,0px))] py-4 backdrop-blur md:pl-6 md:pr-[calc(1.5rem+var(--chat-safe-area-right,0px))] ${
           isMobile
-            ? 'fixed bottom-0 left-0 right-0 z-40 shadow-lg pb-[calc(1rem+var(--chat-safe-area-bottom,0px)+env(safe-area-inset-bottom,0px))]'
+            ? 'fixed bottom-0 left-0 right-0 z-40 shadow-lg pb-[calc(1rem+var(--chat-safe-area-bottom,0px))]'
             : ''
         }`}
       >
@@ -929,25 +1031,21 @@ export default function ChatWindow({ conversation, currentUserId, onBack, onMess
               {newMessage.length}/1000
             </div>
           </div>
-          {shouldShowSendButton ? (
-            <button
-              type="submit"
-              disabled={!canSend || sending}
-              className="flex h-12 w-12 items-center justify-center rounded-xl bg-gradient-to-br from-[#6366f1] to-[#8b5cf6] text-white shadow-lg transition-all duration-200 hover:shadow-xl focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-purple-300 disabled:cursor-not-allowed disabled:opacity-60"
-              aria-label="Send message"
-            >
-              {sending ? (
-                <svg className="h-5 w-5 animate-spin" viewBox="0 0 24 24" aria-hidden="true">
-                  <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" fill="none" />
-                  <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z" />
-                </svg>
-              ) : (
-                <Send className="h-5 w-5" aria-hidden="true" />
-              )}
-            </button>
-          ) : (
-            <div className="h-12 w-12 rounded-xl" aria-hidden="true" />
-          )}
+          <button
+            type="submit"
+            disabled={isSendDisabled}
+            className="flex h-12 w-12 items-center justify-center rounded-xl bg-gradient-to-br from-[#6366f1] to-[#8b5cf6] text-white shadow-lg transition-all duration-200 hover:shadow-xl focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-purple-300 disabled:cursor-not-allowed disabled:opacity-60"
+            aria-label="Send message"
+          >
+            {sending ? (
+              <svg className="h-5 w-5 animate-spin" viewBox="0 0 24 24" aria-hidden="true">
+                <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" fill="none" />
+                <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z" />
+              </svg>
+            ) : (
+              <Send className="h-5 w-5" aria-hidden="true" />
+            )}
+          </button>
         </div>
       </form>
     </div>

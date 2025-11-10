@@ -341,6 +341,7 @@ export default function MessagesPage() {
   const isMobileConversation = Boolean(isMobile && selectedConversation)
   const shouldUseImmersiveConversation = Boolean(messagingMobileV2Enabled && isMobileConversation)
   const showImmersiveConversation = isMobileConversation
+  const isFullBleedMobileLayout = Boolean(messagingMobileV2Enabled && isMobile)
 
   const handleSelectConversation = useCallback(
     (conversationId: string) => {
@@ -484,7 +485,11 @@ export default function MessagesPage() {
     )
   }
 
-  const rootContainerClasses = messagingMobileV2Enabled ? 'bg-gray-50 min-h-screen-dvh md:min-h-screen' : 'min-h-screen bg-gray-50'
+  const rootContainerClasses = isFullBleedMobileLayout
+    ? 'bg-white min-h-screen-dvh md:min-h-screen'
+    : messagingMobileV2Enabled
+      ? 'bg-gray-50 min-h-screen-dvh md:min-h-screen'
+      : 'min-h-screen bg-gray-50'
 
   if (loading) {
     return (
@@ -521,16 +526,22 @@ export default function MessagesPage() {
     )
   }
 
+  const mainPaddingClasses = isFullBleedMobileLayout
+    ? 'mx-auto w-full max-w-7xl px-0 pb-0 pt-[calc(var(--app-header-offset,0px)+1rem)] md:px-6'
+    : 'mx-auto max-w-7xl px-4 pb-12 pt-[calc(var(--app-header-offset,0px)+1.5rem)] md:px-6'
+
+  const containerClasses = isFullBleedMobileLayout
+    ? 'flex min-h-[calc(100dvh-var(--app-header-offset,0px))] flex-col bg-white'
+    : `flex min-h-[calc(100vh-var(--app-header-offset,0px)-4rem)] flex-col overflow-hidden rounded-3xl border border-gray-100 bg-white shadow-sm ${
+        messagingMobileV2Enabled ? 'min-h-chat-card' : ''
+      }`
+
   return (
     <div className={rootContainerClasses}>
       <Header />
 
-      <main className="mx-auto max-w-7xl px-4 pb-12 pt-[calc(var(--app-header-offset,0px)+1.5rem)] md:px-6">
-        <div
-          className={`flex min-h-[calc(100vh-var(--app-header-offset,0px)-4rem)] flex-col overflow-hidden rounded-3xl border border-gray-100 bg-white shadow-sm ${
-            messagingMobileV2Enabled ? 'min-h-chat-card' : ''
-          }`}
-        >
+      <main className={mainPaddingClasses}>
+        <div className={containerClasses}>
           <div className="flex min-h-0 flex-1">
             {/* Left Column - Conversations List */}
             <div
@@ -556,7 +567,7 @@ export default function MessagesPage() {
               </div>
 
               {/* Conversations List */}
-              <div className="flex-1 min-h-0 overflow-y-auto">
+              <div className={`flex-1 min-h-0 overflow-y-auto ${isFullBleedMobileLayout ? 'border-t border-gray-100 bg-white/95' : ''}`}>
                 {filteredConversations.length === 0 ? (
                   <div className="flex flex-col items-center justify-center h-full p-8 text-center">
                     <div className="w-16 h-16 bg-gray-100 rounded-full flex items-center justify-center mb-4">
@@ -573,6 +584,7 @@ export default function MessagesPage() {
                     selectedConversationId={selectedConversationId}
                     onSelectConversation={handleSelectConversation}
                     currentUserId={user?.id || ''}
+                    variant={isFullBleedMobileLayout ? 'compact' : 'default'}
                   />
                 )}
               </div>

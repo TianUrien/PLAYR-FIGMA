@@ -27,14 +27,18 @@ interface ConversationListProps {
   selectedConversationId: string | null
   onSelectConversation: (conversationId: string) => void
   currentUserId: string
+  variant?: 'default' | 'compact'
 }
 
 export default function ConversationList({
   conversations,
   selectedConversationId,
   onSelectConversation,
-  currentUserId
+  currentUserId,
+  variant = 'default'
 }: ConversationListProps) {
+  const isCompact = variant === 'compact'
+
   const getAvatarUrl = (avatarUrl: string | null) => {
     if (!avatarUrl) return null
     if (avatarUrl.startsWith('http')) return avatarUrl
@@ -53,14 +57,19 @@ export default function ConversationList({
         const avatarUrl = getAvatarUrl(conversation.otherParticipant?.avatar_url || null)
         const isUnread = (conversation.unreadCount || 0) > 0
         const isSentByMe = conversation.lastMessage?.sender_id === currentUserId
+        const buttonClasses = `w-full flex items-start gap-3 ${isCompact ? 'px-3 py-3' : 'p-4'} transition-colors ${
+          isSelected
+            ? isCompact
+              ? 'bg-gray-100 hover:bg-gray-100'
+              : 'bg-purple-50 hover:bg-purple-50'
+            : 'hover:bg-gray-50'
+        }`
 
         return (
           <button
             key={conversation.id}
             onClick={() => onSelectConversation(conversation.id)}
-            className={`w-full p-4 flex items-start gap-3 hover:bg-gray-50 transition-colors ${
-              isSelected ? 'bg-purple-50 hover:bg-purple-50' : ''
-            }`}
+            className={buttonClasses}
           >
             {/* Avatar */}
             <div className="relative flex-shrink-0">
@@ -83,7 +92,11 @@ export default function ConversationList({
             <div className="flex-1 min-w-0 text-left">
               <div className="flex items-center justify-between mb-1">
                 <div className="flex items-center gap-2">
-                  <h3 className={`font-semibold text-gray-900 truncate ${isUnread ? 'font-bold' : ''}`}>
+                  <h3
+                    className={`font-semibold text-gray-900 truncate ${isUnread ? 'font-bold' : ''} ${
+                      isCompact ? 'text-sm' : ''
+                    }`}
+                  >
                     {conversation.otherParticipant?.full_name}
                   </h3>
                   <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium ${
