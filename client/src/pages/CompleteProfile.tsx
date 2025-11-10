@@ -57,6 +57,15 @@ export default function CompleteProfile() {
     clubHistory: '',
   })
 
+  const normalizeGender = (value: string) => {
+    const trimmed = value.trim()
+    if (!trimmed) return null
+    const lower = trimmed.toLowerCase()
+    if (lower === 'men' || lower === 'male') return 'Men'
+    if (lower === 'women' || lower === 'female') return 'Women'
+    return 'Other'
+  }
+
   // Use profile data from auth store - no need to fetch again
   const userRole = (profile?.role as UserRole | null) ?? fallbackRole ?? (user?.user_metadata?.role as UserRole | undefined) ?? null
   const profileEmail = profile?.email ?? user?.email ?? fallbackEmail ?? ''
@@ -187,13 +196,13 @@ export default function CompleteProfile() {
         updateData = {
           ...updateData,
           position: formData.position,
-          gender: formData.gender,
+          gender: normalizeGender(formData.gender),
           date_of_birth: formData.dateOfBirth || null,
         }
       } else if (userRole === 'coach') {
         updateData = {
           ...updateData,
-          gender: formData.gender || null,
+          gender: normalizeGender(formData.gender),
           date_of_birth: formData.dateOfBirth || null,
           passport_1: formData.passport1 || null,
           passport_2: formData.passport2 || null,
@@ -533,9 +542,9 @@ export default function CompleteProfile() {
                       required
                     >
                       <option value="">Select gender</option>
-                      <option value="male">Male</option>
-                      <option value="female">Female</option>
-                      <option value="other">Other</option>
+                      <option value="Men">Men</option>
+                      <option value="Women">Women</option>
+                      <option value="Other">Other</option>
                     </select>
                   </div>
 

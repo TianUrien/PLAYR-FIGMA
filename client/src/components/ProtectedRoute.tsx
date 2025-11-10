@@ -49,7 +49,11 @@ export default function ProtectedRoute({ children }: ProtectedRouteProps) {
   }
 
   // Check if current route is public
-  const isPublicRoute = PUBLIC_ROUTES.some(route => location.pathname.startsWith(route))
+  const isPublicRoute = PUBLIC_ROUTES.some(route =>
+    route === '/'
+      ? location.pathname === '/'
+      : location.pathname.startsWith(route)
+  )
 
   // Public routes - allow access regardless of auth status
   if (isPublicRoute) {

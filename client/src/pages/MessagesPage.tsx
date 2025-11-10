@@ -267,6 +267,45 @@ export default function MessagesPage() {
     }
   }, [user?.id, conversationFilter, fetchConversations])
 
+  // Listen for newly created conversations that involve the current user
+  useEffect(() => {
+    if (!user?.id) {
+      return
+    }
+
+    const handleConversationChange = () => {
+      void fetchConversations({ force: true })
+    }
+
+    const channel = supabase
+      .channel(`conversations-realtime:${user.id}`)
+      .on(
+        'postgres_changes',
+        {
+          event: 'INSERT',
+          schema: 'public',
+          table: 'conversations',
+          filter: `participant_one_id=eq.${user.id}`
+        },
+        handleConversationChange
+      )
+      .on(
+        'postgres_changes',
+        {
+          event: 'INSERT',
+          schema: 'public',
+          table: 'conversations',
+          filter: `participant_two_id=eq.${user.id}`
+        },
+        handleConversationChange
+      )
+      .subscribe()
+
+    return () => {
+      supabase.removeChannel(channel)
+    }
+  }, [user?.id, fetchConversations])
+
   const combinedConversations = useMemo(() => {
     if (!pendingConversation) return conversations
 
@@ -285,9 +324,14 @@ export default function MessagesPage() {
     return [pendingConversation, ...conversations]
   }, [conversations, pendingConversation])
 
-  const filteredConversations = combinedConversations.filter((conv) =>
-    conv.otherParticipant?.full_name?.toLowerCase().includes(searchQuery.toLowerCase())
-  )
+  const normalizedQuery = searchQuery.trim().toLowerCase()
+
+  const filteredConversations = normalizedQuery
+    ? combinedConversations.filter((conv) => {
+        const name = conv.otherParticipant?.full_name?.toLowerCase() ?? ''
+        return name.includes(normalizedQuery)
+      })
+    : combinedConversations
 
   const selectedConversation = combinedConversations.find((conv) => conv.id === selectedConversationId)
   const hasActiveConversation = Boolean(selectedConversation)

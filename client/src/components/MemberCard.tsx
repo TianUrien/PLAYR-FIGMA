@@ -4,6 +4,7 @@ import { MessageCircle, User } from 'lucide-react'
 import { Avatar } from '@/components'
 import { useAuthStore } from '@/lib/auth'
 import { supabase } from '@/lib/supabase'
+import { useToastStore } from '@/lib/toast'
 import { formatDistanceToNow } from 'date-fns'
 
 interface MemberCardProps {
@@ -31,6 +32,7 @@ export default function MemberCard({
 }: MemberCardProps) {
   const navigate = useNavigate()
   const { user } = useAuthStore()
+  const { addToast } = useToastStore()
   const [isLoading, setIsLoading] = useState(false)
 
   // Title case formatter
@@ -45,6 +47,7 @@ export default function MemberCard({
   // Handle Message button
   const handleMessage = async () => {
     if (!user) {
+      addToast('Please sign in to start a conversation.', 'info')
       navigate('/')
       return
     }
@@ -73,7 +76,7 @@ export default function MemberCard({
       }
     } catch (error) {
       console.error('Error creating conversation:', error)
-      alert('Failed to start conversation. Please try again.')
+      addToast('Failed to start conversation. Please try again.', 'error')
     } finally {
       setIsLoading(false)
     }

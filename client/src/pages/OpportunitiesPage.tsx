@@ -19,7 +19,6 @@ interface FiltersState {
   gender: 'all' | 'Men' | 'Women'
   location: string
   startDate: 'all' | 'immediate' | 'specific'
-  duration: 'all' | 'short' | 'medium' | 'long'
   benefits: string[]
   priority: 'all' | 'high' | 'medium' | 'low'
 }
@@ -38,7 +37,7 @@ export default function OpportunitiesPage() {
   const [showDetailView, setShowDetailView] = useState(false)
   const [isLoading, setIsLoading] = useState(true)
   const [viewMode, setViewMode] = useState<'grid' | 'list'>('grid')
-  const [sortBy, setSortBy] = useState<'newest' | 'relevance'>('newest')
+  const [sortBy, setSortBy] = useState<'newest'>('newest')
   const [showFilters, setShowFilters] = useState(false)
   
   const [filters, setFilters] = useState<FiltersState>({
@@ -47,7 +46,6 @@ export default function OpportunitiesPage() {
     gender: 'all',
     location: '',
     startDate: 'all',
-    duration: 'all',
     benefits: [],
     priority: 'all',
   })
@@ -136,13 +134,7 @@ export default function OpportunitiesPage() {
           shouldSkipCache ? 0 : 30000 // disable cache when explicitly requested
         )
 
-        setUserApplications(prev => {
-          if (shouldSkipCache) {
-            const merged = new Set([...prev, ...appliedVacancyIds])
-            return Array.from(merged)
-          }
-          return appliedVacancyIds
-        })
+        setUserApplications(appliedVacancyIds)
       } catch (error) {
         logger.error('Error fetching user applications:', error)
       }
@@ -254,7 +246,6 @@ export default function OpportunitiesPage() {
       gender: 'all',
       location: '',
       startDate: 'all',
-      duration: 'all',
       benefits: [],
       priority: 'all',
     })
@@ -313,12 +304,11 @@ export default function OpportunitiesPage() {
               <div className="relative">
                 <select
                   value={sortBy}
-                  onChange={(e) => setSortBy(e.target.value as 'newest' | 'relevance')}
+                  onChange={(e) => setSortBy(e.target.value as 'newest')}
                   className="appearance-none pl-4 pr-10 py-2 border border-gray-300 rounded-lg text-sm font-medium text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-blue-500"
                   title="Sort by"
                 >
                   <option value="newest">Newest</option>
-                  <option value="relevance">Relevance</option>
                 </select>
                 <ChevronDown className="absolute right-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-500 pointer-events-none" />
               </div>

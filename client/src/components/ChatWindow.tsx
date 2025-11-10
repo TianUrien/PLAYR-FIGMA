@@ -7,6 +7,7 @@ import { monitor } from '@/lib/monitor'
 import { logger } from '@/lib/logger'
 import { withRetry } from '@/lib/retry'
 import { requestCache, generateCacheKey } from '@/lib/requestCache'
+import { useToastStore } from '@/lib/toast'
 
 type NullableDate = string | null
 
@@ -55,6 +56,7 @@ export default function ChatWindow({ conversation, currentUserId, onBack, onMess
   const messagesEndRef = useRef<HTMLDivElement>(null)
   const inputRef = useRef<HTMLTextAreaElement>(null)
   const messagesRef = useRef<Message[]>([])
+  const { addToast } = useToastStore()
 
   const syncMessagesState = useCallback(
     (next: Message[] | ((prev: Message[]) => Message[])) => {
@@ -278,7 +280,7 @@ export default function ChatWindow({ conversation, currentUserId, onBack, onMess
 
     const messageContent = newMessage.trim()
     if (messageContent.length > 1000) {
-      alert('Message is too long. Maximum 1000 characters.')
+      addToast('Message is too long. Maximum 1000 characters.', 'error')
       return
     }
 
@@ -435,7 +437,7 @@ export default function ChatWindow({ conversation, currentUserId, onBack, onMess
         }
       }
 
-      alert('Failed to send message. Please try again.')
+      addToast('Failed to send message. Please try again.', 'error')
     } finally {
       setSending(false)
     }

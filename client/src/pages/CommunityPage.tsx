@@ -21,6 +21,7 @@ interface Profile {
 type RoleFilter = 'all' | 'player' | 'coach' | 'club'
 
 export default function CommunityPage() {
+  const [baseMembers, setBaseMembers] = useState<Profile[]>([])
   const [allMembers, setAllMembers] = useState<Profile[]>([])
   const [displayedMembers, setDisplayedMembers] = useState<Profile[]>([])
   const [searchQuery, setSearchQuery] = useState('')
@@ -55,7 +56,8 @@ export default function CommunityPage() {
           30000 // 30 second cache for community members
         )
         
-        setAllMembers(members)
+  setBaseMembers(members)
+  setAllMembers(members)
         setDisplayedMembers(members.slice(0, pageSize))
         setHasMore(members.length > pageSize)
       } catch (error) {
@@ -115,9 +117,11 @@ export default function CommunityPage() {
   useEffect(() => {
     if (!searchQuery.trim()) {
       // Reset to initial load
-      setDisplayedMembers(allMembers.slice(0, pageSize))
+      setIsSearching(false)
+      setAllMembers(baseMembers)
+      setDisplayedMembers(baseMembers.slice(0, pageSize))
       setPage(1)
-      setHasMore(allMembers.length > pageSize)
+      setHasMore(baseMembers.length > pageSize)
       return
     }
 
@@ -126,7 +130,7 @@ export default function CommunityPage() {
     }, 500)
 
     return () => clearTimeout(debounceTimer)
-  }, [searchQuery, allMembers, pageSize, performServerSearch])
+  }, [searchQuery, allMembers, baseMembers, pageSize, performServerSearch])
 
   // Client-side role filtering
   const filteredMembers = useMemo(() => {

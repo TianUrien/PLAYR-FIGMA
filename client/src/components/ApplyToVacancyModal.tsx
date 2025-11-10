@@ -77,11 +77,6 @@ export default function ApplyToVacancyModal({
     setIsSubmitting(true)
     setError(null)
 
-  // ⚡ INSTANT UI UPDATE - Show "Applied!" immediately
-  onSuccess(vacancy.id)
-  onClose()
-
-    // Background database operation
     try {
       const { error: insertError } = await supabase
         .from('vacancy_applications')
@@ -94,7 +89,9 @@ export default function ApplyToVacancyModal({
       if (insertError) {
         // Check for duplicate application error (code 23505 = unique violation)
         if (insertError.code === '23505') {
-          // User already applied - UI already shows correct state
+          // User already applied - treat as success path
+          onSuccess(vacancy.id)
+          onClose()
           addToast('Application confirmed!', 'success')
         } else if (insertError.code === '42501' || insertError.message?.includes('row-level security')) {
           // RLS policy blocked the insert - role mismatch
@@ -113,16 +110,20 @@ export default function ApplyToVacancyModal({
           // Real error - revert optimistic update
           console.error('❌ Error applying to vacancy:', insertError)
           onError?.(vacancy.id)
+          setError('Failed to submit application. Please try again.')
           addToast('Failed to submit application. Please try again.', 'error')
         }
       } else {
         // Success! Application created
+        onSuccess(vacancy.id)
+        onClose()
         addToast('Application submitted successfully!', 'success')
       }
     } catch (err) {
       // Network error - UI already updated
       console.error('❌ Unexpected error:', err)
       onError?.(vacancy.id)
+      setError('Network error. Please check your connection and try again.')
       addToast('Network error. Please check your connection and try again.', 'error')
     } finally {
       setIsSubmitting(false)

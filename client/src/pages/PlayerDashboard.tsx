@@ -8,6 +8,7 @@ import HistoryTab from '@/components/HistoryTab'
 import type { Profile } from '@/lib/supabase'
 import { supabase } from '@/lib/supabase'
 import { useNavigate } from 'react-router-dom'
+import { useToastStore } from '@/lib/toast'
 
 type TabType = 'profile' | 'media' | 'history' | 'achievements' | 'availability'
 
@@ -20,6 +21,7 @@ export default function PlayerDashboard({ profileData, readOnly = false }: Playe
   const { profile: authProfile, user } = useAuthStore()
   const profile = profileData || authProfile
   const navigate = useNavigate()
+  const { addToast } = useToastStore()
   const [activeTab, setActiveTab] = useState<TabType>('profile')
   const [showEditModal, setShowEditModal] = useState(false)
   const [sendingMessage, setSendingMessage] = useState(false)
@@ -57,7 +59,7 @@ export default function PlayerDashboard({ profileData, readOnly = false }: Playe
       }
     } catch (error) {
       console.error('Error creating conversation:', error)
-      alert('Failed to start conversation. Please try again.')
+      addToast('Failed to start conversation. Please try again.', 'error')
     } finally {
       setSendingMessage(false)
     }
