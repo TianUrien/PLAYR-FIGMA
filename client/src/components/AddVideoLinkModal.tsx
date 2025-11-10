@@ -1,10 +1,10 @@
 import { useState, useEffect, useRef, useId } from 'react'
 import { X, Link as LinkIcon, Loader2 } from 'lucide-react'
-import { supabase } from '../lib/supabase'
-import { useAuthStore } from '../lib/auth'
+import { supabase } from '@/lib/supabase'
+import { useAuthStore } from '@/lib/auth'
 import Button from './Button'
 import Input from './Input'
-import type { Profile } from '../lib/database.types'
+import type { Profile } from '@/lib/supabase'
 import { useFocusTrap } from '@/hooks/useFocusTrap'
 import { invalidateProfile } from '@/lib/profile'
 

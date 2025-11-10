@@ -4,7 +4,7 @@ import { useAuthStore } from '@/lib/auth'
 import { Avatar, EditProfileModal } from '@/components'
 import Header from '@/components/Header'
 import MediaTab from '@/components/MediaTab'
-import type { Profile } from '@/lib/database.types'
+import type { Profile } from '@/lib/supabase'
 import { supabase } from '@/lib/supabase'
 import { useNavigate } from 'react-router-dom'
 
@@ -108,7 +108,7 @@ export default function CoachDashboard({ profileData, readOnly = false }: CoachD
               {profile.avatar_url ? (
                 <Avatar
                   src={profile.avatar_url}
-                  alt={profile.full_name}
+                  alt={profile.full_name ?? undefined}
                   size="xl"
                 />
               ) : (

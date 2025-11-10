@@ -2,7 +2,7 @@ import { useState, useEffect, useCallback } from 'react'
 import { Grid, List, ChevronDown, Filter } from 'lucide-react'
 import { supabase } from '../lib/supabase'
 import { useAuthStore } from '../lib/auth'
-import type { Vacancy } from '../lib/database.types'
+import type { Vacancy } from '../lib/supabase'
 import Header from '../components/Header'
 import VacancyCard from '../components/VacancyCard'
 import VacancyDetailView from '../components/VacancyDetailView'
@@ -165,7 +165,7 @@ export default function OpportunitiesPage() {
 
     // Position filter
     if (filters.position.length > 0) {
-      filtered = filtered.filter(v => filters.position.includes(v.position))
+  filtered = filtered.filter(v => v.position !== null && filters.position.includes(v.position))
     }
 
     // Gender filter

@@ -1,9 +1,9 @@
 import { useCallback, useEffect, useId, useRef, useState } from 'react'
 import { X } from 'lucide-react'
-import { supabase } from '../lib/supabase'
-import { useAuthStore } from '../lib/auth'
-import { useToastStore } from '../lib/toast'
-import type { Vacancy } from '../lib/database.types'
+import { supabase } from '@/lib/supabase'
+import { useAuthStore } from '@/lib/auth'
+import { useToastStore } from '@/lib/toast'
+import type { Vacancy } from '@/lib/supabase'
 import Button from './Button'
 import { useFocusTrap } from '@/hooks/useFocusTrap'
 

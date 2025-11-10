@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
 import { ArrowLeft } from 'lucide-react'
 import { supabase } from '../lib/supabase'
-import type { Profile } from '../lib/database.types'
+import type { Profile } from '../lib/supabase'
 import PlayerDashboard from './PlayerDashboard'
 import CoachDashboard from './CoachDashboard'
 

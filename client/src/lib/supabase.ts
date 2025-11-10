@@ -39,6 +39,10 @@ export type GalleryPhoto = Database['public']['Tables']['gallery_photos']['Row']
 export type GalleryPhotoInsert = Database['public']['Tables']['gallery_photos']['Insert']
 export type GalleryPhotoUpdate = Database['public']['Tables']['gallery_photos']['Update']
 
+export type ClubMedia = Database['public']['Tables']['club_media']['Row']
+export type ClubMediaInsert = Database['public']['Tables']['club_media']['Insert']
+export type ClubMediaUpdate = Database['public']['Tables']['club_media']['Update']
+
 export type PlayingHistory = Database['public']['Tables']['playing_history']['Row']
 export type PlayingHistoryInsert = Database['public']['Tables']['playing_history']['Insert']
 export type PlayingHistoryUpdate = Database['public']['Tables']['playing_history']['Update']
@@ -53,5 +57,10 @@ export type ConversationUpdate = Database['public']['Tables']['conversations']['
 
 // Complex joined types
 export type VacancyApplicationWithPlayer = VacancyApplication & {
-  player: Profile
+  player: Pick<
+    Profile,
+    'id' | 'full_name' | 'avatar_url' | 'position' | 'base_location' | 'nationality' | 'username'
+  >
 }
+
+export type { Json } from './database.types'

@@ -1,10 +1,12 @@
 import { create } from 'zustand'
-import type { User, PostgrestError, Session } from '@supabase/supabase-js'
+import type { User, PostgrestError, Session, AuthError } from '@supabase/supabase-js'
+import { AuthApiError } from '@supabase/supabase-js'
 import type { Profile, ProfileInsert } from './supabase'
 import { supabase } from './supabase'
 import { requestCache, generateCacheKey } from './requestCache'
 import { monitor } from './monitor'
 import { logger } from './logger'
+import { useUnreadStore } from './unread'
 
 interface AuthState {
   user: User | null
@@ -39,14 +41,15 @@ export const useAuthStore = create<AuthState>((set, get) => ({
   setHasCompletedOnboardingRedirect: (value) => set({ hasCompletedOnboardingRedirect: value }),
   
   signOut: async () => {
-    await supabase.auth.signOut()
-    set({
-      user: null,
-      profile: null,
-      hasCompletedOnboardingRedirect: false,
-      profileStatus: 'idle',
-      profileFetchedAt: null
-    })
+    const { error } = await supabase.auth.signOut({ scope: 'global' })
+
+    if (error) {
+      logger.error('[AUTH_STORE] Failed to sign out via Supabase', { error })
+      await clearLocalSession('manual-sign-out-fallback', { skipSupabaseSignOut: true })
+      throw error
+    }
+
+    await clearLocalSession('manual-sign-out', { skipSupabaseSignOut: true })
   },
   
   fetchProfile: async (userId, options) => {
@@ -137,6 +140,65 @@ export const useAuthStore = create<AuthState>((set, get) => ({
 
 const localStorageAvailable = () => typeof window !== 'undefined' && typeof window.localStorage !== 'undefined'
 
+interface ClearSessionOptions {
+  skipSupabaseSignOut?: boolean
+}
+
+const clearLocalSession = async (reason: string, options?: ClearSessionOptions) => {
+  logger.warn('[AUTH_STORE] Clearing local session', { reason })
+
+  if (!options?.skipSupabaseSignOut) {
+    try {
+      await supabase.auth.signOut({ scope: 'local' })
+    } catch (signOutError) {
+      logger.error('[AUTH_STORE] Failed to clear local session', { reason, signOutError })
+    }
+  }
+
+  requestCache.clear()
+
+  try {
+    useUnreadStore.getState().reset()
+  } catch (unreadResetError) {
+    logger.error('[AUTH_STORE] Failed to reset unread store during sign-out', { unreadResetError })
+  }
+
+  if (localStorageAvailable()) {
+    try {
+      window.localStorage.removeItem('playr-auth')
+    } catch (storageError) {
+      logger.error('[AUTH_STORE] Failed to remove cached session from storage', { storageError })
+    }
+  }
+
+  useAuthStore.setState({
+    user: null,
+    profile: null,
+    loading: false,
+    hasCompletedOnboardingRedirect: false,
+    profileStatus: 'idle',
+    profileFetchedAt: null
+  })
+}
+
+const isInvalidRefreshTokenError = (error: AuthError | null): error is AuthApiError => {
+  if (!error) return false
+  if (!(error instanceof AuthApiError)) return false
+  return error.message.toLowerCase().includes('invalid refresh token')
+}
+
+const handleSessionError = async (error: AuthError | null, context: string): Promise<boolean> => {
+  if (!error) return false
+
+  if (isInvalidRefreshTokenError(error)) {
+    await clearLocalSession(context)
+    return true
+  }
+
+  logger.error('[AUTH_STORE] Session error encountered', { context, error })
+  return false
+}
+
 const clearPendingRole = () => {
   if (!localStorageAvailable()) return
   window.localStorage.removeItem('pending_role')
@@ -213,16 +275,29 @@ export const initializeAuth = () => {
   const { setLoading } = useAuthStore.getState()
 
   // Check current session
-  supabase.auth.getSession().then(async ({ data: { session } }) => {
+  supabase.auth.getSession().then(async ({ data: { session }, error }) => {
+    const handled = await handleSessionError(error, 'getSession')
+    if (handled) {
+      setLoading(false)
+      return
+    }
+
     await runSessionEffects(session)
     setLoading(false)
   })
 
   // Listen for auth changes
-  const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
+  const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
     setLoading(true)
+
+    if (!session && event === 'SIGNED_OUT') {
+      clearLocalSession('onAuthStateChange-signed-out', { skipSupabaseSignOut: true })
+        .finally(() => setLoading(false))
+      return
+    }
+
     runSessionEffects(session)
-      .catch((error) => logger.error('[AUTH_STORE] Error handling auth state change', { error }))
+      .catch((error) => logger.error('[AUTH_STORE] Error handling auth state change', { error, event }))
       .finally(() => setLoading(false))
   })
 

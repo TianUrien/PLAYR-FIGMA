@@ -4,11 +4,13 @@ import { MessageCircle, LogOut, Users, Briefcase, LayoutDashboard, Settings } fr
 import { Avatar, NotificationBadge } from '@/components'
 import { useAuthStore } from '@/lib/auth'
 import { useUnreadMessages } from '@/hooks/useUnreadMessages'
+import { useToastStore } from '@/lib/toast'
 
 export default function Header() {
   const navigate = useNavigate()
   const { user, profile, signOut } = useAuthStore()
   const { count: unreadCount } = useUnreadMessages()
+  const { addToast } = useToastStore()
   const [dropdownOpen, setDropdownOpen] = useState(false)
   const dropdownRef = useRef<HTMLDivElement>(null)
   const headerRef = useRef<HTMLElement>(null)
@@ -74,8 +76,13 @@ export default function Header() {
   }, [])
 
   const handleSignOut = async () => {
-    await signOut()
-    navigate('/')
+    try {
+      await signOut()
+      navigate('/')
+    } catch (error) {
+      console.error('Failed to sign out', error)
+      addToast('Could not sign out. Please try again.', 'error')
+    }
   }
 
   return (

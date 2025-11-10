@@ -1,10 +1,10 @@
 import { useState, useEffect } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
 import { ArrowLeft } from 'lucide-react'
-import { supabase } from '../lib/supabase'
-import { useAuthStore } from '../lib/auth'
-import type { VacancyApplicationWithPlayer, Vacancy, Json } from '../lib/database.types'
-import ApplicantCard from '../components/ApplicantCard'
+import { supabase } from '@/lib/supabase'
+import { useAuthStore } from '@/lib/auth'
+import type { VacancyApplicationWithPlayer, Vacancy, Json } from '@/lib/supabase'
+import ApplicantCard from '@/components/ApplicantCard'
 
 export default function ApplicantsList() {
   const { vacancyId } = useParams<{ vacancyId: string }>()

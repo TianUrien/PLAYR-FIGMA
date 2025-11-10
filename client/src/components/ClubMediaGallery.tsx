@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react'
-import { supabase } from '../lib/supabase'
-import type { ClubMedia } from '../lib/database.types'
+import { supabase } from '@/lib/supabase'
+import type { ClubMedia } from '@/lib/supabase'
 
 interface ClubMediaGalleryProps {
   clubId: string

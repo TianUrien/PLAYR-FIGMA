@@ -1,6 +1,6 @@
 import { MapPin } from 'lucide-react'
 import { useNavigate } from 'react-router-dom'
-import type { VacancyApplicationWithPlayer } from '../lib/database.types'
+import type { VacancyApplicationWithPlayer } from '@/lib/supabase'
 
 interface ApplicantCardProps {
   application: VacancyApplicationWithPlayer
@@ -9,6 +9,7 @@ interface ApplicantCardProps {
 export default function ApplicantCard({ application }: ApplicantCardProps) {
   const navigate = useNavigate()
   const { player } = application
+  const displayName = player.full_name?.trim() || player.username?.trim() || 'Player'
 
   const formatDate = (dateString: string) => {
     const date = new Date(dateString)
@@ -43,13 +44,13 @@ export default function ApplicantCard({ application }: ApplicantCardProps) {
           {player.avatar_url ? (
             <img
               src={player.avatar_url}
-              alt={player.full_name}
+              alt={displayName}
               className="w-16 h-16 rounded-full object-cover ring-2 ring-gray-200 group-hover:ring-blue-500 transition-all"
             />
           ) : (
             <div className="w-16 h-16 rounded-full bg-gradient-to-br from-blue-500 to-purple-600 flex items-center justify-center ring-2 ring-gray-200 group-hover:ring-blue-500 transition-all">
               <span className="text-white font-bold text-lg">
-                {getInitials(player.full_name)}
+                {getInitials(displayName)}
               </span>
             </div>
           )}
@@ -62,21 +63,19 @@ export default function ApplicantCard({ application }: ApplicantCardProps) {
             className="text-left group"
           >
             <h3 className="text-lg font-bold text-gray-900 group-hover:text-blue-600 transition-colors">
-              {player.full_name}
+              {displayName}
             </h3>
           </button>
           
           <div className="flex items-center gap-3 mt-1 text-sm text-gray-600">
-            {player.position && (
-              <span className="font-medium">{player.position}</span>
-            )}
-            {player.position && player.base_location && (
-              <span>•</span>
-            )}
-            <div className="flex items-center gap-1">
-              <MapPin className="w-3.5 h-3.5" />
-              <span>{player.base_location}</span>
-            </div>
+            {player.position ? <span className="font-medium">{player.position}</span> : null}
+            {player.position && player.base_location ? <span>•</span> : null}
+            {player.base_location ? (
+              <div className="flex items-center gap-1">
+                <MapPin className="w-3.5 h-3.5" />
+                <span>{player.base_location}</span>
+              </div>
+            ) : null}
           </div>
 
           <div className="mt-2 text-xs text-gray-500">

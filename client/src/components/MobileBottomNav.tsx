@@ -4,6 +4,7 @@ import { Users, Briefcase, MessageCircle, LayoutDashboard, Settings, LogOut } fr
 import { useAuthStore } from '@/lib/auth'
 import { Avatar, NotificationBadge } from '@/components'
 import { useUnreadMessages } from '@/hooks/useUnreadMessages'
+import { useToastStore } from '@/lib/toast'
 
 interface NavItem {
   id: string
@@ -17,6 +18,7 @@ export default function MobileBottomNav() {
   const location = useLocation()
   const { profile, user, signOut } = useAuthStore()
   const { count: unreadCount } = useUnreadMessages()
+  const { addToast } = useToastStore()
   const [isKeyboardOpen, setIsKeyboardOpen] = useState(false)
   const [isHidden, setIsHidden] = useState(false)
   const [profileMenuOpen, setProfileMenuOpen] = useState(false)
@@ -233,8 +235,13 @@ export default function MobileBottomNav() {
                 <button
                   onClick={async () => {
                     setProfileMenuOpen(false)
-                    await signOut()
-                    navigate('/')
+                    try {
+                      await signOut()
+                      navigate('/')
+                    } catch (error) {
+                      console.error('Failed to sign out', error)
+                      addToast('Could not sign out. Please try again.', 'error')
+                    }
                   }}
                   className="w-full text-left px-4 py-3 text-sm font-medium text-red-600 hover:bg-red-50 transition-colors flex items-center gap-3"
                   role="menuitem"

@@ -1,8 +1,8 @@
 import { useState, useEffect, useRef, useCallback } from 'react'
 import { Upload, Trash2, GripVertical, Edit2, X, Check } from 'lucide-react'
-import { supabase } from '../lib/supabase'
-import { useAuthStore } from '../lib/auth'
-import type { ClubMedia } from '../lib/database.types'
+import { supabase } from '@/lib/supabase'
+import { useAuthStore } from '@/lib/auth'
+import type { ClubMedia } from '@/lib/supabase'
 
 interface ClubMediaTabProps {
   clubId?: string

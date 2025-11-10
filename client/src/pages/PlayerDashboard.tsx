@@ -5,7 +5,7 @@ import { Avatar, EditProfileModal } from '@/components'
 import Header from '@/components/Header'
 import MediaTab from '@/components/MediaTab'
 import HistoryTab from '@/components/HistoryTab'
-import type { Profile } from '@/lib/database.types'
+import type { Profile } from '@/lib/supabase'
 import { supabase } from '@/lib/supabase'
 import { useNavigate } from 'react-router-dom'
 
