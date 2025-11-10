@@ -165,7 +165,11 @@ export default function OpportunitiesPage() {
 
     // Position filter
     if (filters.position.length > 0) {
-  filtered = filtered.filter(v => v.position !== null && filters.position.includes(v.position))
+      filtered = filtered.filter(v => {
+        if (!v.position) return false
+        const vacancyPosition = v.position.toLowerCase()
+        return filters.position.includes(vacancyPosition)
+      })
     }
 
     // Gender filter
@@ -176,10 +180,11 @@ export default function OpportunitiesPage() {
     // Location filter
     if (filters.location.trim()) {
       const locationLower = filters.location.toLowerCase()
-      filtered = filtered.filter(v =>
-        v.location_city.toLowerCase().includes(locationLower) ||
-        v.location_country.toLowerCase().includes(locationLower)
-      )
+      filtered = filtered.filter(v => {
+        const city = v.location_city?.toLowerCase() ?? ''
+        const country = v.location_country?.toLowerCase() ?? ''
+        return city.includes(locationLower) || country.includes(locationLower)
+      })
     }
 
     // Start date filter

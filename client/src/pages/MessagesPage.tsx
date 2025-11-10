@@ -245,7 +245,7 @@ export default function MessagesPage() {
           filter: conversationFilter
         },
         () => {
-          fetchConversations()
+          void fetchConversations({ force: true })
         }
       )
       .on(
@@ -257,7 +257,7 @@ export default function MessagesPage() {
           filter: conversationFilter
         },
         () => {
-          fetchConversations()
+          void fetchConversations({ force: true })
         }
       )
       .subscribe()
@@ -290,6 +290,7 @@ export default function MessagesPage() {
   )
 
   const selectedConversation = combinedConversations.find((conv) => conv.id === selectedConversationId)
+  const hasActiveConversation = Boolean(selectedConversation)
 
   const handleSelectConversation = useCallback(
     (conversationId: string) => {
@@ -442,7 +443,7 @@ export default function MessagesPage() {
         <div className="flex min-h-[calc(100vh-var(--app-header-offset,0px)-4rem)] flex-col overflow-hidden rounded-3xl border border-gray-100 bg-white shadow-sm">
           <div className="flex min-h-0 flex-1">
             {/* Left Column - Conversations List */}
-            <div className={`flex w-full flex-shrink-0 flex-col border-b border-gray-100 md:w-96 md:border-b-0 md:border-r ${selectedConversationId ? 'hidden md:flex' : 'flex'}`}>
+            <div className={`flex w-full flex-shrink-0 flex-col border-b border-gray-100 md:w-96 md:border-b-0 md:border-r ${hasActiveConversation ? 'hidden md:flex' : 'flex'}`}>
               {/* Header */}
               <div className="p-4 border-b border-gray-200">
                 <h1 className="text-2xl font-bold text-gray-900 mb-4">Messages</h1>
@@ -484,7 +485,7 @@ export default function MessagesPage() {
             </div>
 
             {/* Right Column - Chat Window */}
-            <div className={`flex min-h-0 flex-1 flex-col ${selectedConversationId ? 'flex' : 'hidden md:flex'}`}>
+            <div className={`flex min-h-0 flex-1 flex-col ${hasActiveConversation ? 'flex' : 'hidden md:flex'}`}>
               {selectedConversation ? (
                 <ChatWindow
                   conversation={selectedConversation}
@@ -503,9 +504,17 @@ export default function MessagesPage() {
                     <MessageCircle className="w-10 h-10 text-gray-400" />
                   </div>
                   <h3 className="text-xl font-semibold text-gray-900 mb-2">Select a conversation</h3>
-                  <p className="text-gray-600">
+                  <p className="text-gray-600 mb-6">
                     Choose a conversation from the list to start messaging
                   </p>
+                  {selectedConversationId && (
+                    <button
+                      onClick={handleBackToList}
+                      className="inline-flex items-center gap-2 rounded-lg border border-gray-300 px-4 py-2 text-sm font-medium text-gray-700 transition-colors hover:bg-gray-100"
+                    >
+                      Back to conversations
+                    </button>
+                  )}
                 </div>
               )}
             </div>
