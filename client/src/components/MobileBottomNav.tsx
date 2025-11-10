@@ -23,6 +23,7 @@ export default function MobileBottomNav() {
   const [isHidden, setIsHidden] = useState(false)
   const [profileMenuOpen, setProfileMenuOpen] = useState(false)
   const profileMenuRef = useRef<HTMLDivElement>(null)
+  const messagingMobileV2Enabled = import.meta.env.VITE_MESSAGING_MOBILE_V2 === 'true'
 
   // Navigation items
   const navItems: NavItem[] = [
@@ -84,10 +85,16 @@ export default function MobileBottomNav() {
   useEffect(() => {
     const hiddenRoutes = ['/', '/signup', '/login', '/complete-profile']
     const searchParams = new URLSearchParams(location.search)
-    const isImmersiveMessagesView = location.pathname.startsWith('/messages') && (searchParams.has('conversation') || searchParams.has('new'))
-    const shouldHide = hiddenRoutes.some(route => location.pathname === route) || isImmersiveMessagesView
+    const isConversationPath = location.pathname.startsWith('/messages/')
+    const isImmersiveMessagesView =
+      location.pathname.startsWith('/messages') &&
+      (searchParams.has('conversation') || searchParams.has('new'))
+    const shouldHide =
+      hiddenRoutes.some(route => location.pathname === route) ||
+      isImmersiveMessagesView ||
+      (messagingMobileV2Enabled && isConversationPath)
     setIsHidden(shouldHide)
-  }, [location.pathname, location.search])
+  }, [location.pathname, location.search, messagingMobileV2Enabled])
 
   // Close profile menu when clicking outside
   useEffect(() => {

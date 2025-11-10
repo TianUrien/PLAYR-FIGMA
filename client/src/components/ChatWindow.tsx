@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef, useCallback } from 'react'
+import { useState, useEffect, useRef, useCallback, useId } from 'react'
 import { Send, ArrowLeft } from 'lucide-react'
 import { supabase } from '@/lib/supabase'
 import { format } from 'date-fns'
@@ -40,6 +40,9 @@ interface Conversation {
   isPending?: boolean
 }
 
+const COMPOSER_MIN_HEIGHT = 48
+const COMPOSER_MAX_HEIGHT = 160
+
 interface ChatWindowProps {
   conversation: Conversation
   currentUserId: string
@@ -54,6 +57,7 @@ export default function ChatWindow({ conversation, currentUserId, onBack, onMess
   const [newMessage, setNewMessage] = useState('')
   const [sending, setSending] = useState(false)
   const [loading, setLoading] = useState(true)
+  const [showNewMessagesIndicator, setShowNewMessagesIndicator] = useState(false)
   const messagesEndRef = useRef<HTMLDivElement>(null)
   const inputRef = useRef<HTMLTextAreaElement>(null)
   const messagesRef = useRef<Message[]>([])
@@ -63,6 +67,9 @@ export default function ChatWindow({ conversation, currentUserId, onBack, onMess
   const shouldStickToBottomRef = useRef(true)
   const initialScrollSyncPending = useRef(true)
   const fallbackBaselineInnerHeightRef = useRef<number | null>(null)
+  const pendingUnreadRef = useRef(false)
+  const textareaId = useId()
+  const textareaCharCountId = `${textareaId}-counter`
 
   const syncMessagesState = useCallback(
     (next: Message[] | ((prev: Message[]) => Message[])) => {
@@ -79,6 +86,38 @@ export default function ChatWindow({ conversation, currentUserId, onBack, onMess
     },
     []
   )
+
+  const scrollToLatest = useCallback((behavior: ScrollBehavior = 'auto') => {
+    const scrollEl = scrollContainerRef.current
+    if (scrollEl) {
+      scrollEl.scrollTo({ top: scrollEl.scrollHeight, behavior })
+      return
+    }
+    messagesEndRef.current?.scrollIntoView({ behavior })
+  }, [])
+
+  const isViewerAtBottom = useCallback(() => {
+    const scrollEl = scrollContainerRef.current
+    if (!scrollEl) {
+      return true
+    }
+    const distanceFromBottom = scrollEl.scrollHeight - (scrollEl.scrollTop + scrollEl.clientHeight)
+    return distanceFromBottom <= 96
+  }, [])
+
+  const syncTextareaHeight = useCallback(() => {
+    const textarea = inputRef.current
+    if (!textarea) {
+      return
+    }
+
+    textarea.style.height = 'auto'
+    const contentHeight = textarea.scrollHeight
+    const clampedHeight = Math.min(COMPOSER_MAX_HEIGHT, Math.max(COMPOSER_MIN_HEIGHT, contentHeight))
+    textarea.style.height = `${clampedHeight}px`
+    textarea.style.overflowY = contentHeight > COMPOSER_MAX_HEIGHT ? 'auto' : 'hidden'
+  }, [])
+
 
   const fetchMessages = useCallback(async () => {
     if (!conversation.id || conversation.isPending) {
@@ -111,7 +150,7 @@ export default function ChatWindow({ conversation, currentUserId, onBack, onMess
   }, [conversation.id, conversation.isPending, syncMessagesState])
 
   const markMessagesAsRead = useCallback(
-    async (messagesOverride?: Message[]): Promise<number> => {
+    async (messagesOverride?: Message[], options?: { force?: boolean }): Promise<number> => {
       if (!conversation.id || conversation.isPending) {
         return 0
       }
@@ -129,6 +168,14 @@ export default function ChatWindow({ conversation, currentUserId, onBack, onMess
 
       if (unreadCount === 0) {
         logger.debug('No unread messages to mark, skipping')
+        return 0
+      }
+
+      const force = options?.force ?? false
+
+      if (!force && !isViewerAtBottom()) {
+        logger.debug('Viewer is not at bottom; deferring read receipts')
+        pendingUnreadRef.current = true
         return 0
       }
 
@@ -180,6 +227,8 @@ export default function ChatWindow({ conversation, currentUserId, onBack, onMess
         if (typeof window !== 'undefined' && window.__refreshUnreadBadge) {
           window.__refreshUnreadBadge()
         }
+        pendingUnreadRef.current = false
+        setShowNewMessagesIndicator(false)
         return unreadCount
       } catch (error) {
         logger.error('Error marking messages as read in database:', error)
@@ -189,15 +238,38 @@ export default function ChatWindow({ conversation, currentUserId, onBack, onMess
         }
 
         syncMessagesState(snapshot)
+        pendingUnreadRef.current = true
+        if (!force) {
+          setShowNewMessagesIndicator(true)
+        }
         return -unreadCount
       }
     },
-    [conversation.id, conversation.isPending, currentUserId, onConversationRead, onMessageSent, syncMessagesState]
+    [
+      conversation.id,
+      conversation.isPending,
+      currentUserId,
+      isViewerAtBottom,
+      onConversationRead,
+      onMessageSent,
+      setShowNewMessagesIndicator,
+      syncMessagesState
+    ]
   )
+
+  const handleJumpToLatest = useCallback(() => {
+    scrollToLatest('smooth')
+    shouldStickToBottomRef.current = true
+    pendingUnreadRef.current = false
+    setShowNewMessagesIndicator(false)
+    void markMessagesAsRead(undefined, { force: true })
+  }, [markMessagesAsRead, scrollToLatest])
 
   useEffect(() => {
     shouldStickToBottomRef.current = true
     initialScrollSyncPending.current = true
+    pendingUnreadRef.current = false
+    setShowNewMessagesIndicator(false)
 
     if (!conversation.id || conversation.isPending) {
       setLoading(false)
@@ -211,7 +283,7 @@ export default function ChatWindow({ conversation, currentUserId, onBack, onMess
       const fetched = await fetchMessages()
       if (cancelled) return
 
-      const marked = await markMessagesAsRead(fetched)
+  const marked = await markMessagesAsRead(fetched, { force: true })
       if (cancelled) return
 
       if (marked <= 0) {
@@ -245,15 +317,27 @@ export default function ChatWindow({ conversation, currentUserId, onBack, onMess
         },
         payload => {
           const newMessage = payload.new as Message
+          let messageAppended = false
+
           syncMessagesState(prev => {
             if (prev.some(msg => msg.id === newMessage.id)) {
               return prev
             }
+            messageAppended = true
             return [...prev, newMessage]
           })
 
+          if (!messageAppended) {
+            return
+          }
+
           if (newMessage.sender_id !== currentUserId) {
-            markMessagesAsRead()
+            if (isViewerAtBottom()) {
+              void markMessagesAsRead(undefined, { force: false })
+            } else {
+              pendingUnreadRef.current = true
+              setShowNewMessagesIndicator(true)
+            }
           }
         }
       )
@@ -277,7 +361,15 @@ export default function ChatWindow({ conversation, currentUserId, onBack, onMess
     return () => {
       supabase.removeChannel(channel)
     }
-  }, [conversation.id, conversation.isPending, currentUserId, markMessagesAsRead, syncMessagesState])
+  }, [
+    conversation.id,
+    conversation.isPending,
+    currentUserId,
+    isViewerAtBottom,
+    markMessagesAsRead,
+    setShowNewMessagesIndicator,
+    syncMessagesState
+  ])
 
   useEffect(() => {
     if (!isMobile || typeof window === 'undefined') {
@@ -294,17 +386,23 @@ export default function ChatWindow({ conversation, currentUserId, onBack, onMess
         const bottomInset = Math.max(0, window.innerHeight - viewport.height - viewport.offsetTop)
         const rightInset = Math.max(0, window.innerWidth - (viewport.width + viewport.offsetLeft))
         fallbackBaselineInnerHeightRef.current = window.innerHeight
-        document.documentElement.style.setProperty('--chat-safe-area-bottom', `${bottomInset}px`)
+        document.documentElement.style.setProperty(
+          '--chat-safe-area-bottom',
+          `calc(${bottomInset}px + env(safe-area-inset-bottom, 0px))`
+        )
         document.documentElement.style.setProperty('--chat-safe-area-right', `${rightInset}px`)
         return
       }
 
       if (fallbackBaselineInnerHeightRef.current === null || window.innerHeight >= fallbackBaselineInnerHeightRef.current) {
         fallbackBaselineInnerHeightRef.current = window.innerHeight
-        document.documentElement.style.setProperty('--chat-safe-area-bottom', '0px')
+  document.documentElement.style.setProperty('--chat-safe-area-bottom', 'env(safe-area-inset-bottom, 0px)')
       } else {
         const bottomInset = Math.max(0, fallbackBaselineInnerHeightRef.current - window.innerHeight)
-        document.documentElement.style.setProperty('--chat-safe-area-bottom', `${bottomInset}px`)
+        document.documentElement.style.setProperty(
+          '--chat-safe-area-bottom',
+          `calc(${bottomInset}px + env(safe-area-inset-bottom, 0px))`
+        )
       }
 
       document.documentElement.style.setProperty('--chat-safe-area-right', '0px')
@@ -386,8 +484,19 @@ export default function ChatWindow({ conversation, currentUserId, onBack, onMess
     if (!scrollEl) return
 
     const handleScroll = () => {
-      const distanceFromBottom = scrollEl.scrollHeight - (scrollEl.scrollTop + scrollEl.clientHeight)
-      shouldStickToBottomRef.current = distanceFromBottom < 96
+      const atBottom = isViewerAtBottom()
+      shouldStickToBottomRef.current = atBottom
+
+      if (atBottom) {
+        if (showNewMessagesIndicator) {
+          setShowNewMessagesIndicator(false)
+        }
+
+        if (pendingUnreadRef.current) {
+          pendingUnreadRef.current = false
+          void markMessagesAsRead(undefined, { force: false })
+        }
+      }
     }
 
     handleScroll()
@@ -396,7 +505,7 @@ export default function ChatWindow({ conversation, currentUserId, onBack, onMess
     if (typeof ResizeObserver !== 'undefined') {
       const observer = new ResizeObserver(() => {
         if (shouldStickToBottomRef.current) {
-          scrollEl.scrollTo({ top: scrollEl.scrollHeight })
+          scrollToLatest('auto')
           shouldStickToBottomRef.current = true
         }
       })
@@ -411,34 +520,39 @@ export default function ChatWindow({ conversation, currentUserId, onBack, onMess
     return () => {
       scrollEl.removeEventListener('scroll', handleScroll)
     }
-  }, [conversation.id])
+  }, [
+    conversation.id,
+    isViewerAtBottom,
+    markMessagesAsRead,
+    scrollToLatest,
+    setShowNewMessagesIndicator,
+    showNewMessagesIndicator
+  ])
 
   useEffect(() => {
     if (!messages.length) {
       return
     }
 
-    const scrollEl = scrollContainerRef.current
     const lastMessage = messages[messages.length - 1]
-    const shouldForceScroll = lastMessage?.sender_id === currentUserId
+    const isOwnMessage = lastMessage?.sender_id === currentUserId
+    const shouldAutoScroll =
+      initialScrollSyncPending.current || isOwnMessage || shouldStickToBottomRef.current
 
-    if (initialScrollSyncPending.current || shouldForceScroll || shouldStickToBottomRef.current) {
+    if (shouldAutoScroll) {
       requestAnimationFrame(() => {
-        if (!scrollEl) {
-          messagesEndRef.current?.scrollIntoView({ behavior: 'auto' })
-          shouldStickToBottomRef.current = true
-          initialScrollSyncPending.current = false
-          return
-        }
-        scrollEl.scrollTo({
-          top: scrollEl.scrollHeight,
-          behavior: initialScrollSyncPending.current ? 'auto' : 'smooth',
-        })
+        scrollToLatest(initialScrollSyncPending.current ? 'auto' : 'smooth')
         shouldStickToBottomRef.current = true
         initialScrollSyncPending.current = false
+        pendingUnreadRef.current = false
+        setShowNewMessagesIndicator(false)
       })
     }
-  }, [messages, currentUserId])
+  }, [messages, currentUserId, scrollToLatest])
+
+  useEffect(() => {
+    syncTextareaHeight()
+  }, [conversation.id, newMessage, syncTextareaHeight])
 
   const handleSendMessage = async (e: React.FormEvent) => {
     e.preventDefault()
@@ -644,8 +758,15 @@ export default function ChatWindow({ conversation, currentUserId, onBack, onMess
     )
   }
 
+  const canSend = newMessage.trim().length > 0
+  const shouldShowSendButton = canSend || sending
+
   return (
-    <div className={`flex h-full w-full flex-col bg-gray-50 ${isMobile ? 'pb-[var(--chat-safe-area-bottom,0px)]' : ''}`}>
+    <div
+      className={`flex h-full w-full min-h-0 flex-col bg-gray-50 ${
+        isMobile ? 'pb-[var(--chat-safe-area-bottom,0px)]' : ''
+      }`}
+    >
       <div
         className={`flex flex-shrink-0 items-center gap-3 border-b border-gray-200 bg-white pl-4 pr-[calc(1rem+var(--chat-safe-area-right,0px))] py-4 shadow-sm md:pl-6 md:pr-[calc(1.5rem+var(--chat-safe-area-right,0px))] ${
           isMobile ? 'sticky top-0 z-40 pt-[calc(env(safe-area-inset-top)+1rem)]' : 'sticky top-[var(--app-header-offset,0px)] z-30'
@@ -697,7 +818,7 @@ export default function ChatWindow({ conversation, currentUserId, onBack, onMess
 
       <div
         ref={scrollContainerRef}
-        className={`flex-1 overflow-y-auto pt-6 scroll-smooth pl-4 pr-[calc(1rem+var(--chat-safe-area-right,0px))] md:pl-6 md:pr-[calc(1.5rem+var(--chat-safe-area-right,0px))] ${
+        className={`flex-1 min-h-0 overflow-y-auto overscroll-contain pt-6 pl-4 pr-[calc(1rem+var(--chat-safe-area-right,0px))] md:pl-6 md:pr-[calc(1.5rem+var(--chat-safe-area-right,0px))] ${
           isMobile
             ? 'pb-[calc(var(--chat-composer-height,72px)+var(--chat-safe-area-bottom,0px)+1rem)]'
             : 'pb-24 md:pb-20'
@@ -708,53 +829,66 @@ export default function ChatWindow({ conversation, currentUserId, onBack, onMess
             No messages yet. Start the conversation!
           </div>
         ) : (
-          <div className="flex flex-col gap-4">
-            {messages.map((message, index) => {
-              const isMyMessage = message.sender_id === currentUserId
-              const isPending = message.id.startsWith('optimistic-')
-              const showTimestamp =
-                index === 0 ||
-                new Date(message.sent_at).getTime() - new Date(messages[index - 1].sent_at).getTime() > 300000
+          <>
+            <div className="flex flex-col gap-4">
+              {messages.map((message, index) => {
+                const isMyMessage = message.sender_id === currentUserId
+                const isPending = message.id.startsWith('optimistic-')
+                const showTimestamp =
+                  index === 0 ||
+                  new Date(message.sent_at).getTime() - new Date(messages[index - 1].sent_at).getTime() > 300000
 
-              return (
-                <div key={message.id}>
-                  {showTimestamp && (
-                    <div className="mb-3 text-center text-xs font-medium uppercase tracking-wide text-gray-400">
-                      {format(new Date(message.sent_at), 'MMM d, yyyy h:mm a')}
-                    </div>
-                  )}
-                  <div className={`flex ${isMyMessage ? 'justify-end' : 'justify-start'}`}>
-                    <div
-                      className={`max-w-[75%] rounded-2xl px-4 py-3 text-sm shadow-sm md:max-w-[70%] ${
-                        isMyMessage
-                          ? isPending
-                            ? 'bg-gradient-to-br from-[#6366f1]/70 to-[#8b5cf6]/70 text-white'
-                            : 'bg-gradient-to-br from-[#6366f1] to-[#8b5cf6] text-white'
-                          : 'bg-white text-gray-900'
-                      } ${!isMyMessage ? 'border border-gray-200' : ''}`}
-                    >
-                      <p className="whitespace-pre-wrap break-words leading-relaxed">{message.content}</p>
-                      <div className="mt-2 flex items-center gap-2 text-xs">
-                        <p className={isMyMessage ? 'text-purple-100' : 'text-gray-500'}>
-                          {format(new Date(message.sent_at), 'h:mm a')}
-                        </p>
-                        {isPending && (
-                          <span className="flex items-center gap-1 text-purple-100">
-                            <svg className="h-3 w-3 animate-spin" viewBox="0 0 24 24">
-                              <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" fill="none" />
-                              <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z" />
-                            </svg>
-                            Sending
-                          </span>
-                        )}
+                return (
+                  <div key={message.id}>
+                    {showTimestamp && (
+                      <div className="mb-3 text-center text-xs font-medium uppercase tracking-wide text-gray-400">
+                        {format(new Date(message.sent_at), 'MMM d, yyyy h:mm a')}
+                      </div>
+                    )}
+                    <div className={`flex ${isMyMessage ? 'justify-end' : 'justify-start'}`}>
+                      <div
+                        className={`max-w-[75%] rounded-2xl px-4 py-3 text-sm shadow-sm md:max-w-[70%] ${
+                          isMyMessage
+                            ? isPending
+                              ? 'bg-gradient-to-br from-[#6366f1]/70 to-[#8b5cf6]/70 text-white'
+                              : 'bg-gradient-to-br from-[#6366f1] to-[#8b5cf6] text-white'
+                            : 'bg-white text-gray-900'
+                        } ${!isMyMessage ? 'border border-gray-200' : ''}`}
+                      >
+                        <p className="whitespace-pre-wrap break-words leading-relaxed">{message.content}</p>
+                        <div className="mt-2 flex items-center gap-2 text-xs">
+                          <p className={isMyMessage ? 'text-purple-100' : 'text-gray-500'}>
+                            {format(new Date(message.sent_at), 'h:mm a')}
+                          </p>
+                          {isPending && (
+                            <span className="flex items-center gap-1 text-purple-100">
+                              <svg className="h-3 w-3 animate-spin" viewBox="0 0 24 24">
+                                <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" fill="none" />
+                                <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z" />
+                              </svg>
+                              Sending
+                            </span>
+                          )}
+                        </div>
                       </div>
                     </div>
                   </div>
-                </div>
-              )
-            })}
-            <div ref={messagesEndRef} />
-          </div>
+                )
+              })}
+              <div ref={messagesEndRef} />
+            </div>
+            {showNewMessagesIndicator && (
+              <div className="sticky bottom-4 flex justify-center pb-2">
+                <button
+                  type="button"
+                  onClick={handleJumpToLatest}
+                  className="inline-flex items-center gap-2 rounded-full bg-white/95 px-4 py-2 text-sm font-semibold text-gray-900 shadow-lg ring-1 ring-gray-200 backdrop-blur transition focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-purple-500 hover:shadow-xl"
+                >
+                  New messages, tap to jump
+                </button>
+              </div>
+            )}
+          </>
         )}
       </div>
 
@@ -763,33 +897,57 @@ export default function ChatWindow({ conversation, currentUserId, onBack, onMess
         data-chat-composer="true"
         className={`flex-shrink-0 border-t border-gray-200 bg-white/95 pl-4 pr-[calc(1rem+var(--chat-safe-area-right,0px))] py-4 backdrop-blur md:pl-6 md:pr-[calc(1.5rem+var(--chat-safe-area-right,0px))] ${
           isMobile
-            ? 'fixed bottom-0 left-0 right-0 z-40 shadow-lg pb-[calc(1rem+var(--chat-safe-area-bottom,0px))]'
+            ? 'fixed bottom-0 left-0 right-0 z-40 shadow-lg pb-[calc(1rem+var(--chat-safe-area-bottom,0px)+env(safe-area-inset-bottom,0px))]'
             : ''
         }`}
       >
         <div className="flex items-end gap-3 md:gap-4">
           <div className="relative flex-1">
+            <label htmlFor={textareaId} className="sr-only">
+              Message
+            </label>
             <textarea
               ref={inputRef}
               value={newMessage}
-              onChange={e => setNewMessage(e.target.value)}
+              onChange={e => {
+                setNewMessage(e.target.value)
+                syncTextareaHeight()
+              }}
               onKeyDown={handleKeyDown}
               placeholder="Type a message..."
               rows={1}
-              className="w-full resize-none rounded-xl border border-transparent bg-gray-100 px-4 py-3 text-sm shadow-inner focus:border-purple-200 focus:bg-white focus:outline-none focus:ring-2 focus:ring-purple-100 md:rounded-2xl md:px-5 md:py-3"
+              maxLength={1000}
+              id={textareaId}
+              aria-describedby={textareaCharCountId}
+              className="w-full resize-none rounded-xl border border-transparent bg-gray-100 px-4 py-3 text-base leading-relaxed shadow-inner outline-none transition focus:border-purple-200 focus:bg-white focus:ring-2 focus:ring-purple-100 md:rounded-2xl md:px-5 md:py-3 overflow-y-hidden"
             />
-            <div className="pointer-events-none absolute bottom-2 right-3 text-xs font-medium text-gray-400 md:bottom-2.5 md:right-3">
+            <div
+              id={textareaCharCountId}
+              className="pointer-events-none absolute bottom-2 right-3 text-xs font-medium text-gray-400 md:bottom-2.5 md:right-3"
+              aria-live="polite"
+            >
               {newMessage.length}/1000
             </div>
           </div>
-          <button
-            type="submit"
-            disabled={!newMessage.trim() || sending}
-            className="flex h-12 w-12 items-center justify-center rounded-xl bg-gradient-to-br from-[#6366f1] to-[#8b5cf6] text-white shadow-lg transition-all duration-200 hover:shadow-xl focus:outline-none focus:ring-2 focus:ring-purple-300 focus:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-60"
-            aria-label="Send message"
-          >
-            <Send className="h-5 w-5" />
-          </button>
+          {shouldShowSendButton ? (
+            <button
+              type="submit"
+              disabled={!canSend || sending}
+              className="flex h-12 w-12 items-center justify-center rounded-xl bg-gradient-to-br from-[#6366f1] to-[#8b5cf6] text-white shadow-lg transition-all duration-200 hover:shadow-xl focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-purple-300 disabled:cursor-not-allowed disabled:opacity-60"
+              aria-label="Send message"
+            >
+              {sending ? (
+                <svg className="h-5 w-5 animate-spin" viewBox="0 0 24 24" aria-hidden="true">
+                  <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" fill="none" />
+                  <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z" />
+                </svg>
+              ) : (
+                <Send className="h-5 w-5" aria-hidden="true" />
+              )}
+            </button>
+          ) : (
+            <div className="h-12 w-12 rounded-xl" aria-hidden="true" />
+          )}
         </div>
       </form>
     </div>

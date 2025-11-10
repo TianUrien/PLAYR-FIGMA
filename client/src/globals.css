@@ -209,6 +209,22 @@
 }
 
 @layer utilities {
+  .h-screen-dvh {
+    height: 100dvh;
+  }
+
+  .min-h-screen-dvh {
+    min-height: 100dvh;
+  }
+
+  .safe-area-padding-bottom {
+    padding-bottom: env(safe-area-inset-bottom);
+  }
+
+  .min-h-chat-card {
+    min-height: calc(100dvh - var(--app-header-offset, 0px) - 4rem);
+  }
+
   /* Custom Animations */
   @keyframes fadeIn {
     from {

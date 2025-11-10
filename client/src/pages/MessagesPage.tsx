@@ -44,6 +44,7 @@ export default function MessagesPage() {
   const [searchQuery, setSearchQuery] = useState('')
   const [loading, setLoading] = useState(true)
   const isMobile = useMediaQuery('(max-width: 767px)')
+  const messagingMobileV2Enabled = import.meta.env.VITE_MESSAGING_MOBILE_V2 === 'true'
 
   // Set selected conversation from URL parameter
   useEffect(() => {
@@ -337,7 +338,9 @@ export default function MessagesPage() {
 
   const selectedConversation = combinedConversations.find((conv) => conv.id === selectedConversationId)
   const hasActiveConversation = Boolean(selectedConversation)
-  const showImmersiveConversation = Boolean(isMobile && selectedConversation)
+  const isMobileConversation = Boolean(isMobile && selectedConversation)
+  const shouldUseImmersiveConversation = Boolean(messagingMobileV2Enabled && isMobileConversation)
+  const showImmersiveConversation = isMobileConversation
 
   const handleSelectConversation = useCallback(
     (conversationId: string) => {
@@ -447,6 +450,23 @@ export default function MessagesPage() {
     [user?.id]
   )
 
+  if (shouldUseImmersiveConversation && selectedConversation) {
+    return (
+      <div className="flex h-screen-dvh min-h-screen-dvh flex-col bg-gray-50">
+        <div className="flex flex-1 overflow-hidden">
+          <ChatWindow
+            conversation={selectedConversation}
+            currentUserId={user?.id || ''}
+            onBack={handleBackToList}
+            onMessageSent={() => {}}
+            onConversationCreated={handleConversationCreated}
+            onConversationRead={handleConversationRead}
+          />
+        </div>
+      </div>
+    )
+  }
+
   if (showImmersiveConversation && selectedConversation) {
     return (
       <div className="flex min-h-screen flex-col bg-gray-50">
@@ -464,9 +484,11 @@ export default function MessagesPage() {
     )
   }
 
+  const rootContainerClasses = messagingMobileV2Enabled ? 'bg-gray-50 min-h-screen-dvh md:min-h-screen' : 'min-h-screen bg-gray-50'
+
   if (loading) {
     return (
-      <div className="min-h-screen bg-gray-50">
+      <div className={rootContainerClasses}>
         <Header />
         <div className="flex items-center justify-center pt-20 h-[calc(100vh-80px)]">
           <main className="max-w-7xl mx-auto px-4 md:px-6 w-full">
@@ -500,11 +522,15 @@ export default function MessagesPage() {
   }
 
   return (
-    <div className="min-h-screen bg-gray-50">
+    <div className={rootContainerClasses}>
       <Header />
 
       <main className="mx-auto max-w-7xl px-4 pb-12 pt-[calc(var(--app-header-offset,0px)+1.5rem)] md:px-6">
-        <div className="flex min-h-[calc(100vh-var(--app-header-offset,0px)-4rem)] flex-col overflow-hidden rounded-3xl border border-gray-100 bg-white shadow-sm">
+        <div
+          className={`flex min-h-[calc(100vh-var(--app-header-offset,0px)-4rem)] flex-col overflow-hidden rounded-3xl border border-gray-100 bg-white shadow-sm ${
+            messagingMobileV2Enabled ? 'min-h-chat-card' : ''
+          }`}
+        >
           <div className="flex min-h-0 flex-1">
             {/* Left Column - Conversations List */}
             <div
