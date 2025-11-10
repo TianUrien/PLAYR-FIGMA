@@ -1,8 +1,9 @@
 import { useState, useEffect, useCallback } from 'react'
-import { Plus, Edit2, Copy, Archive, MapPin, Calendar, Users, Eye, Rocket, X, Trash2 } from 'lucide-react'
+import { Plus, Edit2, Copy, Archive, MapPin, Calendar, Users, Eye, Rocket, Trash2 } from 'lucide-react'
 import { useNavigate } from 'react-router-dom'
 import { supabase } from '../lib/supabase'
 import { useAuthStore } from '../lib/auth'
+import { useToastStore } from '@/lib/toast'
 import type { Vacancy } from '../lib/supabase'
 import Button from './Button'
 import CreateVacancyModal from './CreateVacancyModal'
@@ -22,6 +23,7 @@ export default function VacanciesTab({ profileId, readOnly = false, triggerCreat
   const { user, profile } = useAuthStore()
   const targetUserId = profileId || user?.id
   const navigate = useNavigate()
+  const { addToast } = useToastStore()
   const [vacancies, setVacancies] = useState<Vacancy[]>([])
   const [applicantCounts, setApplicantCounts] = useState<Record<string, number>>({})
   const [userApplications, setUserApplications] = useState<Set<string>>(new Set())
@@ -43,8 +45,6 @@ export default function VacanciesTab({ profileId, readOnly = false, triggerCreat
   // Publish confirmation modal state
   const [showPublishModal, setShowPublishModal] = useState(false)
   const [vacancyToPublish, setVacancyToPublish] = useState<Vacancy | null>(null)
-  const [showSuccessToast, setShowSuccessToast] = useState(false)
-  
   // Delete confirmation modal state
   const [showDeleteModal, setShowDeleteModal] = useState(false)
   const [vacancyToDelete, setVacancyToDelete] = useState<Vacancy | null>(null)
@@ -215,9 +215,10 @@ export default function VacanciesTab({ profileId, readOnly = false, triggerCreat
       if (error) throw error
       
       await fetchVacancies()
+      addToast('Vacancy duplicated as draft.', 'success')
     } catch (error) {
       console.error('Error duplicating vacancy:', error)
-      alert('Failed to duplicate vacancy. Please try again.')
+      addToast('Failed to duplicate vacancy. Please try again.', 'error')
     } finally {
       setActionLoading(null)
     }
@@ -236,9 +237,10 @@ export default function VacanciesTab({ profileId, readOnly = false, triggerCreat
       if (error) throw error
       
       await fetchVacancies()
+      addToast('Vacancy closed.', 'success')
     } catch (error) {
       console.error('Error closing vacancy:', error)
-      alert('Failed to close vacancy. Please try again.')
+      addToast('Failed to close vacancy. Please try again.', 'error')
     } finally {
       setActionLoading(null)
     }
@@ -266,15 +268,10 @@ export default function VacanciesTab({ profileId, readOnly = false, triggerCreat
       // Close modal and show success toast
       setShowPublishModal(false)
       setVacancyToPublish(null)
-      setShowSuccessToast(true)
-      
-      // Auto-hide toast after 3 seconds
-      setTimeout(() => {
-        setShowSuccessToast(false)
-      }, 3000)
+      addToast('Vacancy published successfully!', 'success')
     } catch (error) {
       console.error('Error publishing vacancy:', error)
-      alert('Failed to publish vacancy. Please try again.')
+      addToast('Failed to publish vacancy. Please try again.', 'error')
     } finally {
       setActionLoading(null)
     }
@@ -304,9 +301,10 @@ export default function VacanciesTab({ profileId, readOnly = false, triggerCreat
       // Close modal
       setShowDeleteModal(false)
       setVacancyToDelete(null)
+      addToast('Vacancy deleted.', 'success')
     } catch (error) {
       console.error('Error deleting vacancy:', error)
-      alert('Failed to delete vacancy. Please try again.')
+      addToast('Failed to delete vacancy. Please try again.', 'error')
     } finally {
       setActionLoading(null)
     }
@@ -683,30 +681,6 @@ export default function VacanciesTab({ profileId, readOnly = false, triggerCreat
           vacancyTitle={vacancyToDelete.title}
           isLoading={actionLoading === vacancyToDelete.id}
         />
-      )}
-
-      {/* Success Toast */}
-      {showSuccessToast && (
-        <div className="fixed bottom-6 right-6 z-50 animate-slide-up">
-          <div className="bg-white rounded-lg shadow-2xl border border-green-200 p-4 flex items-center gap-3 min-w-[300px]">
-            <div className="w-10 h-10 bg-green-100 rounded-full flex items-center justify-center flex-shrink-0">
-              <svg className="w-6 h-6 text-green-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
-              </svg>
-            </div>
-            <div className="flex-1">
-              <p className="font-semibold text-gray-900">Published Successfully!</p>
-              <p className="text-sm text-gray-600">Your opportunity is now visible to all players</p>
-            </div>
-            <button
-              onClick={() => setShowSuccessToast(false)}
-              className="p-1 hover:bg-gray-100 rounded-lg transition-colors"
-              aria-label="Dismiss"
-            >
-              <X className="w-4 h-4 text-gray-500" />
-            </button>
-          </div>
-        </div>
       )}
     </div>
   )

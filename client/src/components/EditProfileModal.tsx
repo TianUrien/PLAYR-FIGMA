@@ -8,6 +8,7 @@ import { logger } from '@/lib/logger'
 import { optimizeImage, validateImage } from '@/lib/imageOptimization'
 import { useFocusTrap } from '@/hooks/useFocusTrap'
 import { invalidateProfile } from '@/lib/profile'
+import { useToastStore } from '@/lib/toast'
 
 interface EditProfileModalProps {
   isOpen: boolean
@@ -17,6 +18,7 @@ interface EditProfileModalProps {
 
 export default function EditProfileModal({ isOpen, onClose, role }: EditProfileModalProps) {
   const { profile, setProfile } = useAuthStore()
+  const { addToast } = useToastStore()
   const fileInputRef = useRef<HTMLInputElement>(null)
   const dialogRef = useRef<HTMLDivElement>(null)
   const closeButtonRef = useRef<HTMLButtonElement | null>(null)
@@ -210,7 +212,7 @@ export default function EditProfileModal({ isOpen, onClose, role }: EditProfileM
       }
   await invalidateProfile({ userId: profileId, reason: 'profile-update-retry' })
       // Show error but don't reopen modal - user already sees their changes
-      alert('Some profile changes may not have saved. Please refresh the page.')
+      addToast('Some profile changes may not have saved. Please refresh the page.', 'error')
     } finally {
       setLoading(false)
     }

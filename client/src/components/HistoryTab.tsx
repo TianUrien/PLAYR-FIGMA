@@ -2,6 +2,7 @@ import { useState, useEffect, useCallback } from 'react'
 import { Edit2, Plus, X, Trash2 } from 'lucide-react'
 import { supabase } from '@/lib/supabase'
 import { useAuthStore } from '@/lib/auth'
+import { useToastStore } from '@/lib/toast'
 import type { PlayingHistory } from '@/lib/supabase'
 import Button from './Button'
 
@@ -23,6 +24,7 @@ interface HistoryTabProps {
 
 export default function HistoryTab({ profileId, readOnly = false }: HistoryTabProps) {
   const { user } = useAuthStore()
+  const { addToast } = useToastStore()
   const targetUserId = profileId || user?.id
   const [history, setHistory] = useState<EditablePlayingHistory[]>([])
   const [isLoading, setIsLoading] = useState(true)
@@ -244,9 +246,10 @@ export default function HistoryTab({ profileId, readOnly = false }: HistoryTabPr
       setIsEditing(false)
       setEditedHistory([])
       setErrors({})
+      addToast('Playing history updated successfully.', 'success')
     } catch (error) {
       console.error('Error saving playing history:', error)
-      alert('Failed to save changes. Please try again.')
+      addToast('Failed to save changes. Please try again.', 'error')
     } finally {
       setIsLoading(false)
     }

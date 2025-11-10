@@ -8,6 +8,7 @@ import AddVideoLinkModal from './AddVideoLinkModal'
 import { optimizeImage, validateImage } from '@/lib/imageOptimization'
 import { logger } from '@/lib/logger'
 import { invalidateProfile } from '@/lib/profile'
+import { useToastStore } from '@/lib/toast'
 
 interface MediaTabProps {
   profileId?: string
@@ -17,6 +18,7 @@ interface MediaTabProps {
 export default function MediaTab({ profileId, readOnly = false }: MediaTabProps) {
   const { user, profile: authProfile } = useAuthStore()
   const targetUserId = profileId || user?.id
+  const { addToast } = useToastStore()
   const [targetProfile, setTargetProfile] = useState<Profile | null>(null)
   const [showAddVideoModal, setShowAddVideoModal] = useState(false)
   const [galleryPhotos, setGalleryPhotos] = useState<GalleryPhoto[]>([])
@@ -94,7 +96,7 @@ export default function MediaTab({ profileId, readOnly = false }: MediaTabProps)
         // Validate file
         const validation = validateImage(file)
         if (!validation.valid) {
-          alert(`${file.name}: ${validation.error}`)
+          addToast(`${file.name}: ${validation.error}`, 'error')
           continue
         }
 
@@ -137,9 +139,10 @@ export default function MediaTab({ profileId, readOnly = false }: MediaTabProps)
       // Refresh gallery
       await fetchGalleryPhotos()
       logger.info(`Successfully uploaded ${files.length} photo(s)`)
+      addToast(`Uploaded ${files.length} photo${files.length === 1 ? '' : 's'} successfully.`, 'success')
     } catch (error) {
       logger.error('Error uploading photos:', error)
-      alert('Failed to upload photos. Please try again.')
+      addToast('Failed to upload photos. Please try again.', 'error')
     } finally {
       setIsUploading(false)
       // Reset input
@@ -176,7 +179,7 @@ export default function MediaTab({ profileId, readOnly = false }: MediaTabProps)
       setGalleryPhotos(prev => prev.filter(p => p.id !== photo.id))
     } catch (error) {
       console.error('Error deleting photo:', error)
-      alert('Failed to delete photo. Please try again.')
+      addToast('Failed to delete photo. Please try again.', 'error')
     } finally {
       setDeletingPhotoId(null)
     }
@@ -197,7 +200,7 @@ export default function MediaTab({ profileId, readOnly = false }: MediaTabProps)
       await invalidateProfile({ userId: user.id, reason: 'highlight-video-removed' })
     } catch (error) {
       console.error('Error deleting video:', error)
-      alert('Failed to remove video. Please try again.')
+      addToast('Failed to remove video. Please try again.', 'error')
     } finally {
       setDeletingVideo(false)
     }

@@ -5,6 +5,7 @@ import { useAuthStore } from '../lib/auth'
 import type { Vacancy, VacancyInsert } from '../lib/supabase'
 import Button from './Button'
 import { useFocusTrap } from '@/hooks/useFocusTrap'
+import { useToastStore } from '@/lib/toast'
 
 interface CreateVacancyModalProps {
   isOpen: boolean
@@ -30,6 +31,7 @@ export default function CreateVacancyModal({ isOpen, onClose, onSuccess, editing
   const { user } = useAuthStore()
   const [isLoading, setIsLoading] = useState(false)
   const [errors, setErrors] = useState<Record<string, string>>({})
+  const { addToast } = useToastStore()
 
   const [formData, setFormData] = useState<Partial<VacancyInsert>>({
     opportunity_type: editingVacancy?.opportunity_type || 'player',
@@ -186,7 +188,15 @@ export default function CreateVacancyModal({ isOpen, onClose, onSuccess, editing
   }
 
   const handleSave = async () => {
-    if (!user || !validate()) return
+    if (!user) {
+      addToast('You need to be signed in to manage opportunities.', 'error')
+      return
+    }
+
+    if (!validate()) {
+      addToast('Please fix the highlighted fields before saving.', 'error')
+      return
+    }
 
     setIsLoading(true)
     try {
@@ -220,6 +230,7 @@ export default function CreateVacancyModal({ isOpen, onClose, onSuccess, editing
           .eq('id', editingVacancy.id)
 
         if (error) throw error
+        addToast('Opportunity updated successfully.', 'success')
       } else {
         // Create new vacancy
         const { error } = await supabase
@@ -227,13 +238,14 @@ export default function CreateVacancyModal({ isOpen, onClose, onSuccess, editing
           .insert(vacancyData as never)
 
         if (error) throw error
+        addToast('Opportunity created successfully.', 'success')
       }
 
       onSuccess()
       onClose()
     } catch (error) {
       console.error('Error saving vacancy:', error)
-      alert('Failed to save vacancy. Please try again.')
+      addToast('Failed to save opportunity. Please try again.', 'error')
     } finally {
       setIsLoading(false)
     }

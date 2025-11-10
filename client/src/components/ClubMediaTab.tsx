@@ -2,6 +2,7 @@ import { useState, useEffect, useRef, useCallback } from 'react'
 import { Upload, Trash2, GripVertical, Edit2, X, Check } from 'lucide-react'
 import { supabase } from '@/lib/supabase'
 import { useAuthStore } from '@/lib/auth'
+import { useToastStore } from '@/lib/toast'
 import type { ClubMedia } from '@/lib/supabase'
 
 interface ClubMediaTabProps {
@@ -20,6 +21,7 @@ export default function ClubMediaTab({ clubId, readOnly = false }: ClubMediaTabP
   const { user } = useAuthStore()
   const targetClubId = clubId || user?.id
   const fileInputRef = useRef<HTMLInputElement>(null)
+  const { addToast } = useToastStore()
   
   const [media, setMedia] = useState<ClubMedia[]>([])
   const [isLoading, setIsLoading] = useState(true)
@@ -83,7 +85,7 @@ export default function ClubMediaTab({ clubId, readOnly = false }: ClubMediaTabP
     for (const file of fileArray) {
       const error = validateFile(file)
       if (error) {
-        alert(`${file.name}: ${error}`)
+        addToast(`${file.name}: ${error}`, 'error')
         continue
       }
       validFiles.push(file)
@@ -198,7 +200,7 @@ export default function ClubMediaTab({ clubId, readOnly = false }: ClubMediaTabP
       await fetchMedia()
     } catch (error) {
       console.error('Error deleting media:', error)
-      alert('Failed to delete photo. Please try again.')
+      addToast('Failed to delete photo. Please try again.', 'error')
     }
   }
 
@@ -283,7 +285,7 @@ export default function ClubMediaTab({ clubId, readOnly = false }: ClubMediaTabP
       await fetchMedia()
     } catch (error) {
       console.error('Error updating caption:', error)
-      alert('Failed to update caption')
+      addToast('Failed to update caption. Please try again.', 'error')
     }
   }
 
@@ -354,12 +356,13 @@ export default function ClubMediaTab({ clubId, readOnly = false }: ClubMediaTabP
                 </span>
               </div>
               <div className="w-full bg-gray-200 rounded-full h-2 overflow-hidden">
-                <div
-                  className={`h-2 rounded-full transition-all ${
-                    item.status === 'success' ? 'bg-green-500' :
-                    item.status === 'error' ? 'bg-red-500' : 'bg-blue-500'
+                <progress
+                  value={item.progress}
+                  max={100}
+                  className={`progress-bar h-2 w-full rounded-full ${
+                    item.status === 'success' ? 'text-green-500' :
+                    item.status === 'error' ? 'text-red-500' : 'text-blue-500'
                   }`}
-                  style={{ width: `${item.progress}%` } as React.CSSProperties}
                 />
               </div>
               {item.error && (
