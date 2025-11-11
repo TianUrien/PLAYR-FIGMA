@@ -52,6 +52,7 @@ export default function ApplicantsList() {
               full_name,
               avatar_url,
               position,
+              secondary_position,
               base_location,
               nationality,
               username
@@ -79,6 +80,7 @@ export default function ApplicantsList() {
             full_name: string
             avatar_url: string | null
             position: string | null
+            secondary_position: string | null
             base_location: string
             nationality: string
             username: string | null
@@ -99,6 +101,7 @@ export default function ApplicantsList() {
             full_name: app.player.full_name,
             avatar_url: app.player.avatar_url,
             position: app.player.position,
+            secondary_position: app.player.secondary_position,
             base_location: app.player.base_location,
             nationality: app.player.nationality,
             username: app.player.username,

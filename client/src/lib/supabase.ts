@@ -59,7 +59,7 @@ export type ConversationUpdate = Database['public']['Tables']['conversations']['
 export type VacancyApplicationWithPlayer = VacancyApplication & {
   player: Pick<
     Profile,
-    'id' | 'full_name' | 'avatar_url' | 'position' | 'base_location' | 'nationality' | 'username'
+    'id' | 'full_name' | 'avatar_url' | 'position' | 'secondary_position' | 'base_location' | 'nationality' | 'username'
   >
 }
 

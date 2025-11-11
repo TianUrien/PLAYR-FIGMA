@@ -15,6 +15,7 @@ interface MemberCardProps {
   nationality: string | null
   base_location: string | null
   position: string | null
+  secondary_position: string | null
   current_team: string | null
   created_at: string
 }
@@ -27,6 +28,7 @@ export default function MemberCard({
   nationality,
   base_location,
   position,
+  secondary_position,
   current_team,
   created_at,
 }: MemberCardProps) {
@@ -34,6 +36,10 @@ export default function MemberCard({
   const { user } = useAuthStore()
   const { addToast } = useToastStore()
   const [isLoading, setIsLoading] = useState(false)
+  const positions = [position, secondary_position].filter((value, index, self): value is string => {
+    if (!value) return false
+    return self.findIndex((item) => item === value) === index
+  })
 
   // Title case formatter
   const toTitleCase = (str: string | null) => {
@@ -140,10 +146,10 @@ export default function MemberCard({
           </div>
         )}
 
-        {position && (role === 'player' || role === 'coach') && (
+        {positions.length > 0 && (role === 'player' || role === 'coach') && (
           <div className="flex items-start gap-2">
             <span className="font-medium text-gray-500">Position:</span>
-            <span>{toTitleCase(position)}</span>
+            <span>{positions.map(toTitleCase).join(' • ')}</span>
           </div>
         )}
 

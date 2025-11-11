@@ -99,6 +99,10 @@ export default function PlayerDashboard({ profileData, readOnly = false }: Playe
   }
 
   const age = calculateAge(profile.date_of_birth)
+  const positions = [profile.position, profile.secondary_position].filter((value, index, self): value is string => {
+    if (!value) return false
+    return self.findIndex((item) => item === value) === index
+  })
 
   return (
     <div className="min-h-screen bg-gray-50">
@@ -175,12 +179,12 @@ export default function PlayerDashboard({ profileData, readOnly = false }: Playe
                 )}
 
                 {/* Position (if specified) */}
-                {profile.position && (
+                {positions.length > 0 && (
                   <>
                     <span className="text-gray-400">•</span>
                     <div className="flex items-center gap-1.5">
                       <span>🏑</span>
-                      <span>{profile.position}</span>
+                      <span>{positions.join(' • ')}</span>
                     </div>
                   </>
                 )}
@@ -229,121 +233,166 @@ export default function PlayerDashboard({ profileData, readOnly = false }: Playe
           {/* Tab Content */}
           <div className="p-6 md:p-8">
             {activeTab === 'profile' && (
-              <div className="space-y-6 animate-fade-in">
-                <h2 className="text-2xl font-bold text-gray-900 mb-6">Basic Information</h2>
-
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                  {/* Left Column */}
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-1">
-                      Full Name
-                    </label>
-                    <p className="text-gray-900 font-medium">{profile.full_name}</p>
-                  </div>
-
-                  {/* Right Column */}
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-1">
-                      Email Address
-                    </label>
-                    <p className="text-gray-900">{profile.email}</p>
-                  </div>
-
-                  {/* Left Column */}
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-1">
-                      Nationality
-                    </label>
-                    <p className="text-gray-900">{profile.nationality}</p>
-                  </div>
-
-                  {/* Right Column */}
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-1">
-                      Base Location (City)
-                    </label>
-                    <p className="text-gray-900">{profile.base_location}</p>
-                  </div>
-
-                  {/* Left Column */}
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-1">
-                      Position
-                    </label>
-                    <p className={profile.position ? "text-gray-900" : "text-gray-500 italic"}>
-                      {profile.position || 'Not specified'}
-                    </p>
-                  </div>
-
-                  {/* Right Column */}
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-1">
-                      Gender
-                    </label>
-                    <p className={profile.gender ? "text-gray-900" : "text-gray-500 italic"}>
-                      {profile.gender || 'Not specified'}
-                    </p>
-                  </div>
-
-                  {/* Left Column */}
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-1">
-                      Date of Birth {age && `(Age: ${age})`}
-                    </label>
-                    {profile.date_of_birth ? (
-                      <p className="text-gray-900">
-                        {new Date(profile.date_of_birth).toLocaleDateString('en-US', {
-                          year: 'numeric',
-                          month: 'long',
-                          day: 'numeric',
-                        })}
-                      </p>
-                    ) : (
-                      <p className="text-gray-500 italic">Not specified</p>
+              <div className="space-y-10 animate-fade-in">
+                <section className="space-y-6">
+                  <div className="flex items-start justify-between gap-4">
+                    <h2 className="text-2xl font-bold text-gray-900">Basic Information</h2>
+                    {!readOnly && (
+                      <button
+                        onClick={() => setShowEditModal(true)}
+                        className="hidden md:inline-flex items-center gap-2 px-4 py-2 bg-[#6366f1] text-white rounded-lg hover:bg-[#4f46e5] transition-colors text-sm font-medium"
+                      >
+                        <Edit2 className="w-4 h-4" />
+                        Edit Profile
+                      </button>
                     )}
                   </div>
 
-                  <div className="md:col-span-2 space-y-6">
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                    {/* Left Column */}
                     <div>
                       <label className="block text-sm font-medium text-gray-700 mb-1">
-                        Passport 1
+                        Full Name
                       </label>
-                      <p className={profile.passport_1 ? "text-gray-900" : "text-gray-500 italic"}>
-                        {profile.passport_1 || 'Not specified'}
+                      <p className="text-gray-900 font-medium">{profile.full_name}</p>
+                    </div>
+
+                    {/* Right Column */}
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-1">
+                        Email Address
+                      </label>
+                      <p className="text-gray-900">{profile.email}</p>
+                    </div>
+
+                    {/* Left Column */}
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-1">
+                        Nationality
+                      </label>
+                      <p className="text-gray-900">{profile.nationality}</p>
+                    </div>
+
+                    {/* Right Column */}
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-1">
+                        Base Location (City)
+                      </label>
+                      <p className="text-gray-900">{profile.base_location}</p>
+                    </div>
+
+                    {/* Left Column */}
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-1">
+                        Positions
+                      </label>
+                      <p className={positions.length > 0 ? 'text-gray-900' : 'text-gray-500 italic'}>
+                        {positions.length > 0 ? positions.join(' • ') : 'Not specified'}
                       </p>
                     </div>
 
-                    {profile.passport_2 && (
+                    {/* Right Column */}
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-1">
+                        Gender
+                      </label>
+                      <p className={profile.gender ? "text-gray-900" : "text-gray-500 italic"}>
+                        {profile.gender || 'Not specified'}
+                      </p>
+                    </div>
+
+                    {/* Left Column */}
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-1">
+                        Date of Birth {age && `(Age: ${age})`}
+                      </label>
+                      {profile.date_of_birth ? (
+                        <p className="text-gray-900">
+                          {new Date(profile.date_of_birth).toLocaleDateString('en-US', {
+                            year: 'numeric',
+                            month: 'long',
+                            day: 'numeric',
+                          })}
+                        </p>
+                      ) : (
+                        <p className="text-gray-500 italic">Not specified</p>
+                      )}
+                    </div>
+
+                    <div className="md:col-span-2 space-y-6">
                       <div>
                         <label className="block text-sm font-medium text-gray-700 mb-1">
-                          Passport 2
+                          Passport 1
                         </label>
-                        <p className="text-gray-900">{profile.passport_2}</p>
+                        <p className={profile.passport_1 ? "text-gray-900" : "text-gray-500 italic"}>
+                          {profile.passport_1 || 'Not specified'}
+                        </p>
+                      </div>
+
+                      {profile.passport_2 && (
+                        <div>
+                          <label className="block text-sm font-medium text-gray-700 mb-1">
+                            Passport 2
+                          </label>
+                          <p className="text-gray-900">{profile.passport_2}</p>
+                        </div>
+                      )}
+                    </div>
+
+                    {/* Left Column */}
+                    {profile.current_club && (
+                      <div>
+                        <label className="block text-sm font-medium text-gray-700 mb-1">
+                          Current Club
+                        </label>
+                        <p className="text-gray-900">{profile.current_club}</p>
                       </div>
                     )}
                   </div>
 
-                  {/* Left Column */}
-                  {profile.current_club && (
-                    <div>
-                      <label className="block text-sm font-medium text-gray-700 mb-1">
-                        Current Club
-                      </label>
-                      <p className="text-gray-900">{profile.current_club}</p>
+                  {!readOnly && (
+                    <div className="pt-6 border-t border-gray-200 md:hidden">
+                      <button
+                        onClick={() => setShowEditModal(true)}
+                        className="w-full px-6 py-3 bg-[#6366f1] text-white rounded-lg hover:bg-[#4f46e5] transition-colors font-medium"
+                      >
+                        Update Profile Information
+                      </button>
                     </div>
                   )}
-                </div>
+                </section>
 
-                {!readOnly && (
-                  <div className="pt-6 border-t border-gray-200">
-                    <button 
-                      onClick={() => setShowEditModal(true)}
-                      className="px-6 py-3 bg-[#6366f1] text-white rounded-lg hover:bg-[#4f46e5] transition-colors font-medium"
-                    >
-                      Update Profile Information
-                    </button>
+                <section className="space-y-4">
+                  <div className="flex items-start justify-between gap-4">
+                    <h2 className="text-2xl font-bold text-gray-900">About Me</h2>
+                    {!readOnly && (
+                      <button
+                        onClick={() => setShowEditModal(true)}
+                        className="inline-flex items-center gap-2 px-4 py-2 bg-gray-100 text-gray-700 rounded-lg hover:bg-gray-200 transition-colors text-sm font-medium"
+                      >
+                        <Edit2 className="w-4 h-4" />
+                        Edit
+                      </button>
+                    )}
                   </div>
-                )}
+
+                  <div className="bg-gray-50 border border-gray-200 rounded-xl p-6">
+                    {profile.bio?.trim() ? (
+                      <p className="text-gray-700 leading-relaxed whitespace-pre-line">
+                        {profile.bio}
+                      </p>
+                    ) : (
+                      <div className="text-gray-500 italic space-y-2">
+                        <p>No bio yet.</p>
+                        {!readOnly && (
+                          <p>
+                            Use the edit option to share your background, playing style, and what you&apos;re looking for in a club.
+                          </p>
+                        )}
+                      </div>
+                    )}
+                  </div>
+                </section>
               </div>
             )}
 

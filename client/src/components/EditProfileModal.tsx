@@ -32,6 +32,7 @@ export default function EditProfileModal({ isOpen, onClose, role }: EditProfileM
     nationality: profile?.nationality || '',
     date_of_birth: profile?.date_of_birth || '',
     position: profile?.position || '',
+    secondary_position: profile?.secondary_position || '',
     gender: profile?.gender || '',
     passport_1: profile?.passport_1 || '',
     passport_2: profile?.passport_2 || '',
@@ -122,8 +123,14 @@ export default function EditProfileModal({ isOpen, onClose, role }: EditProfileM
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
-    setLoading(true)
     setError('')
+
+    if (role === 'player' && formData.secondary_position && formData.secondary_position === formData.position) {
+      setError('Primary and secondary positions must be different.')
+      return
+    }
+
+    setLoading(true)
 
     // Create optimistic update object
     const optimisticUpdate: Record<string, unknown> = {
@@ -135,11 +142,13 @@ export default function EditProfileModal({ isOpen, onClose, role }: EditProfileM
     if (role === 'player') {
       optimisticUpdate.nationality = formData.nationality
       optimisticUpdate.position = formData.position
+      optimisticUpdate.secondary_position = formData.secondary_position || null
       optimisticUpdate.gender = formData.gender
       optimisticUpdate.date_of_birth = formData.date_of_birth || null
       optimisticUpdate.passport_1 = formData.passport_1 || null
       optimisticUpdate.passport_2 = formData.passport_2 || null
       optimisticUpdate.current_club = formData.current_club || null
+      optimisticUpdate.bio = formData.bio || null
     } else if (role === 'coach') {
       optimisticUpdate.nationality = formData.nationality
       optimisticUpdate.gender = formData.gender || null
@@ -158,8 +167,8 @@ export default function EditProfileModal({ isOpen, onClose, role }: EditProfileM
       optimisticUpdate.club_history = formData.club_history || null
     }
 
-  const previousProfile = profile
-  const profileId = profile.id
+    const previousProfile = profile
+    const profileId = profile.id
     const optimisticProfile = previousProfile
       ? ({ ...previousProfile, ...optimisticUpdate } as Profile)
       : null
@@ -180,7 +189,7 @@ export default function EditProfileModal({ isOpen, onClose, role }: EditProfileM
       const { data, error: updateError } = await supabase
         .from('profiles')
         .update(optimisticUpdate)
-  .eq('id', profileId)
+        .eq('id', profileId)
         .select('*')
         .single()
 
@@ -202,7 +211,7 @@ export default function EditProfileModal({ isOpen, onClose, role }: EditProfileM
       }
 
       // Force refresh from server to pick up computed fields/triggers
-  await invalidateProfile({ userId: profileId, reason: 'profile-updated' })
+      await invalidateProfile({ userId: profileId, reason: 'profile-updated' })
     } catch (err) {
       logger.error('Profile update error:', err)
       logger.error('Error type:', typeof err)
@@ -210,7 +219,7 @@ export default function EditProfileModal({ isOpen, onClose, role }: EditProfileM
       if (previousProfile) {
         setProfile(previousProfile)
       }
-  await invalidateProfile({ userId: profileId, reason: 'profile-update-retry' })
+      await invalidateProfile({ userId: profileId, reason: 'profile-update-retry' })
       // Show error but don't reopen modal - user already sees their changes
       addToast('Some profile changes may not have saved. Please refresh the page.', 'error')
     } finally {
@@ -338,6 +347,26 @@ export default function EditProfileModal({ isOpen, onClose, role }: EditProfileM
                 </div>
 
                 <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2" htmlFor="player-secondary-position">
+                    Second Position (Optional)
+                  </label>
+                  <select
+                    id="player-secondary-position"
+                    value={formData.secondary_position}
+                    onChange={(e) => setFormData({ ...formData, secondary_position: e.target.value })}
+                    className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#6366f1] focus:border-transparent"
+                    aria-label="Select secondary position"
+                  >
+                    <option value="">No secondary position</option>
+                    {['Goalkeeper', 'Defender', 'Midfielder', 'Forward'].map((option) => (
+                      <option key={option} value={option} disabled={option === formData.position}>
+                        {option}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+
+                <div>
                   <label className="block text-sm font-medium text-gray-700 mb-2" htmlFor="player-gender">
                     Gender
                   </label>
@@ -386,6 +415,21 @@ export default function EditProfileModal({ isOpen, onClose, role }: EditProfileM
                   onChange={(e) => setFormData({ ...formData, current_club: e.target.value })}
                   placeholder="e.g., Holcombe Hockey Club"
                 />
+
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2" htmlFor="player-bio">
+                    About Me (Optional)
+                  </label>
+                  <textarea
+                    id="player-bio"
+                    value={formData.bio || ''}
+                    onChange={(e) => setFormData({ ...formData, bio: e.target.value })}
+                    rows={4}
+                    className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#6366f1] focus:border-transparent resize-none"
+                    placeholder="Share your playing background, strengths, and goals"
+                    aria-label="About me"
+                  />
+                </div>
               </>
             )}
 

@@ -10,6 +10,10 @@ export default function ApplicantCard({ application }: ApplicantCardProps) {
   const navigate = useNavigate()
   const { player } = application
   const displayName = player.full_name?.trim() || player.username?.trim() || 'Player'
+  const positions = [player.position, player.secondary_position].filter((value, index, self): value is string => {
+    if (!value) return false
+    return self.findIndex((item) => item === value) === index
+  })
 
   const formatDate = (dateString: string) => {
     const date = new Date(dateString)
@@ -68,8 +72,8 @@ export default function ApplicantCard({ application }: ApplicantCardProps) {
           </button>
           
           <div className="mt-1 flex flex-wrap items-center gap-2 text-xs text-gray-600 sm:text-sm">
-            {player.position ? <span className="font-medium">{player.position}</span> : null}
-            {player.position && player.base_location ? <span>•</span> : null}
+            {positions.length > 0 ? <span className="font-medium">{positions.join(' • ')}</span> : null}
+            {positions.length > 0 && player.base_location ? <span>•</span> : null}
             {player.base_location ? (
               <div className="flex items-center gap-1">
                 <MapPin className="h-3 w-3 sm:h-3.5 sm:w-3.5" />

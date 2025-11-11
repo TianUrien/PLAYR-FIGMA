@@ -46,6 +46,7 @@ export default function CompleteProfile() {
     country: '',
     dateOfBirth: '',
     position: '',
+    secondaryPosition: '',
     gender: '',
     passport1: '',
     passport2: '',
@@ -169,6 +170,10 @@ export default function CompleteProfile() {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
     setError('')
+    if (userRole === 'player' && formData.secondaryPosition && formData.secondaryPosition === formData.position) {
+      setError('Primary and secondary positions must be different.')
+      return
+    }
     setLoading(true)
 
     try {
@@ -196,6 +201,7 @@ export default function CompleteProfile() {
         updateData = {
           ...updateData,
           position: formData.position,
+          secondary_position: formData.secondaryPosition || null,
           gender: normalizeGender(formData.gender),
           date_of_birth: formData.dateOfBirth || null,
         }
@@ -470,6 +476,25 @@ export default function CompleteProfile() {
                       <option value="Defender">Defender</option>
                       <option value="Midfielder">Midfielder</option>
                       <option value="Forward">Forward</option>
+                    </select>
+                  </div>
+
+                  <div>
+                    <label htmlFor="secondary-position-select" className="block text-sm font-medium text-gray-700 mb-2">
+                      Second Position (Optional)
+                    </label>
+                    <select
+                      id="secondary-position-select"
+                      value={formData.secondaryPosition}
+                      onChange={(e) => setFormData({ ...formData, secondaryPosition: e.target.value })}
+                      className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#6366f1] focus:border-transparent"
+                    >
+                      <option value="">No secondary position</option>
+                      {['Goalkeeper', 'Defender', 'Midfielder', 'Forward'].map((option) => (
+                        <option key={option} value={option} disabled={option === formData.position}>
+                          {option}
+                        </option>
+                      ))}
                     </select>
                   </div>
 

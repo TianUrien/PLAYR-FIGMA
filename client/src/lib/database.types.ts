@@ -261,6 +261,7 @@ export type Database = {
           passport_1: string | null
           passport_2: string | null
           position: string | null
+          secondary_position: string | null
           role: string
           updated_at: string
           username: string | null
@@ -289,6 +290,7 @@ export type Database = {
           passport_1?: string | null
           passport_2?: string | null
           position?: string | null
+          secondary_position?: string | null
           role: string
           updated_at?: string
           username?: string | null
@@ -317,6 +319,7 @@ export type Database = {
           passport_1?: string | null
           passport_2?: string | null
           position?: string | null
+          secondary_position?: string | null
           role?: string
           updated_at?: string
           username?: string | null
