@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback } from 'react'
-import { Plus, Edit2, Copy, Archive, MapPin, Calendar, Users, Eye, Rocket, Trash2 } from 'lucide-react'
+import { Plus, Edit2, Copy, Archive, MapPin, Calendar, Users, Eye, Rocket, Trash2, Loader2 } from 'lucide-react'
 import { useNavigate } from 'react-router-dom'
 import { supabase } from '../lib/supabase'
 import { useAuthStore } from '../lib/auth'
@@ -31,7 +31,8 @@ export default function VacanciesTab({ profileId, readOnly = false, triggerCreat
   const [isLoading, setIsLoading] = useState(true)
   const [showModal, setShowModal] = useState(false)
   const [editingVacancy, setEditingVacancy] = useState<Vacancy | null>(null)
-  const [actionLoading, setActionLoading] = useState<string | null>(null) // Track which vacancy action is loading
+  type VacancyAction = 'publish' | 'close' | 'delete' | 'duplicate'
+  const [actionLoading, setActionLoading] = useState<{ id: string; action: VacancyAction } | null>(null)
   
   // Apply modal state
   const [showApplyModal, setShowApplyModal] = useState(false)
@@ -198,7 +199,7 @@ export default function VacanciesTab({ profileId, readOnly = false, triggerCreat
   const handleDuplicate = async (vacancy: Vacancy) => {
     if (!user || actionLoading) return
 
-    setActionLoading(vacancy.id)
+    setActionLoading({ id: vacancy.id, action: 'duplicate' })
     try {
       // eslint-disable-next-line @typescript-eslint/no-unused-vars
       const { id, created_at, updated_at, published_at, closed_at, ...duplicateData } = vacancy
@@ -228,7 +229,7 @@ export default function VacanciesTab({ profileId, readOnly = false, triggerCreat
   const handleClose = async (vacancyId: string) => {
     if (actionLoading) return
     
-    setActionLoading(vacancyId)
+    setActionLoading({ id: vacancyId, action: 'close' })
     try {
       const { error } = await supabase
         .from('vacancies')
@@ -253,9 +254,9 @@ export default function VacanciesTab({ profileId, readOnly = false, triggerCreat
   }
 
   const handlePublish = async () => {
-    if (actionLoading || !vacancyToPublish) return
+  if (actionLoading || !vacancyToPublish) return
     
-    setActionLoading(vacancyToPublish.id)
+  setActionLoading({ id: vacancyToPublish.id, action: 'publish' })
     try {
       const { error } = await supabase
         .from('vacancies')
@@ -284,9 +285,9 @@ export default function VacanciesTab({ profileId, readOnly = false, triggerCreat
   }
 
   const handleDelete = async () => {
-    if (actionLoading || !vacancyToDelete) return
+  if (actionLoading || !vacancyToDelete) return
     
-    setActionLoading(vacancyToDelete.id)
+  setActionLoading({ id: vacancyToDelete.id, action: 'delete' })
     try {
       // Delete the vacancy (cascade will handle applications)
       const { error } = await supabase
@@ -571,12 +572,21 @@ export default function VacanciesTab({ profileId, readOnly = false, triggerCreat
                   {vacancy.status === 'draft' && (
                     <button
                       onClick={() => handlePublishClick(vacancy)}
-                      disabled={actionLoading === vacancy.id}
-                      className="w-full flex items-center justify-center gap-2 px-6 py-3.5 text-sm font-bold text-white bg-gradient-to-r from-green-500 to-green-600 hover:from-green-600 hover:to-green-700 rounded-lg shadow-lg shadow-green-500/30 hover:shadow-xl hover:shadow-green-500/40 transition-all disabled:opacity-50 disabled:cursor-not-allowed transform hover:scale-[1.02]"
+                      disabled={Boolean(actionLoading)}
+                      className="w-full flex items-center justify-center gap-2 px-6 py-3.5 text-sm font-bold text-white bg-gradient-to-r from-green-500 to-green-600 hover:from-green-600 hover:to-green-700 rounded-lg shadow-lg shadow-green-500/30 hover:shadow-xl hover:shadow-green-500/40 transition-all disabled:cursor-not-allowed disabled:opacity-70 transform hover:scale-[1.02]"
                       title="Publish this opportunity to make it visible to all players"
                     >
-                      <Rocket className="w-5 h-5" />
-                      {actionLoading === vacancy.id ? 'Publishing...' : 'Publish Opportunity'}
+                      {actionLoading?.id === vacancy.id && actionLoading.action === 'publish' ? (
+                        <span className="flex items-center gap-2">
+                          <Loader2 className="h-4 w-4 animate-spin" />
+                          Publishing...
+                        </span>
+                      ) : (
+                        <span className="flex items-center gap-2">
+                          <Rocket className="h-5 w-5" />
+                          Publish Opportunity
+                        </span>
+                      )}
                     </button>
                   )}
                   
@@ -584,12 +594,21 @@ export default function VacanciesTab({ profileId, readOnly = false, triggerCreat
                   {vacancy.status === 'open' && (
                     <button
                       onClick={() => handleClose(vacancy.id)}
-                      disabled={actionLoading === vacancy.id}
-                      className="w-full flex items-center justify-center gap-2 px-6 py-3 text-sm font-semibold text-red-700 bg-red-50 hover:bg-red-100 border border-red-200 rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                      disabled={Boolean(actionLoading)}
+                      className="w-full flex items-center justify-center gap-2 px-6 py-3 text-sm font-semibold text-red-700 bg-red-50 hover:bg-red-100 border border-red-200 rounded-lg transition-colors disabled:cursor-not-allowed disabled:opacity-70"
                       title="Close vacancy"
                     >
-                      <Archive className="w-4 h-4" />
-                      {actionLoading === vacancy.id ? 'Closing...' : 'Close Opportunity'}
+                      {actionLoading?.id === vacancy.id && actionLoading.action === 'close' ? (
+                        <span className="flex items-center gap-2">
+                          <Loader2 className="h-4 w-4 animate-spin" />
+                          Closing...
+                        </span>
+                      ) : (
+                        <span className="flex items-center gap-2">
+                          <Archive className="h-4 w-4" />
+                          Close Opportunity
+                        </span>
+                      )}
                     </button>
                   )}
                   
@@ -597,12 +616,21 @@ export default function VacanciesTab({ profileId, readOnly = false, triggerCreat
                   {vacancy.status === 'closed' && (
                     <button
                       onClick={() => handleDeleteClick(vacancy)}
-                      disabled={actionLoading === vacancy.id}
-                      className="w-full flex items-center justify-center gap-2 px-6 py-3 text-sm font-semibold text-red-700 bg-red-50 hover:bg-red-100 border border-red-200 rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                      disabled={Boolean(actionLoading)}
+                      className="w-full flex items-center justify-center gap-2 px-6 py-3 text-sm font-semibold text-red-700 bg-red-50 hover:bg-red-100 border border-red-200 rounded-lg transition-colors disabled:cursor-not-allowed disabled:opacity-70"
                       title="Permanently delete vacancy"
                     >
-                      <Trash2 className="w-4 h-4" />
-                      {actionLoading === vacancy.id ? 'Deleting...' : 'Delete Permanently'}
+                      {actionLoading?.id === vacancy.id && actionLoading.action === 'delete' ? (
+                        <span className="flex items-center gap-2">
+                          <Loader2 className="h-4 w-4 animate-spin" />
+                          Deleting...
+                        </span>
+                      ) : (
+                        <span className="flex items-center gap-2">
+                          <Trash2 className="h-4 w-4" />
+                          Delete Permanently
+                        </span>
+                      )}
                     </button>
                   )}
                   
@@ -610,8 +638,8 @@ export default function VacanciesTab({ profileId, readOnly = false, triggerCreat
                   <div className="flex items-center gap-2">
                     <button
                       onClick={() => handleEdit(vacancy)}
-                      disabled={actionLoading === vacancy.id}
-                      className="flex-1 flex items-center justify-center gap-2 px-4 py-2.5 text-sm font-medium text-gray-700 bg-white border border-gray-300 hover:bg-gray-50 hover:border-gray-400 rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                      disabled={Boolean(actionLoading)}
+                      className="flex-1 flex items-center justify-center gap-2 px-4 py-2.5 text-sm font-medium text-gray-700 bg-white border border-gray-300 hover:bg-gray-50 hover:border-gray-400 rounded-lg transition-colors disabled:cursor-not-allowed disabled:opacity-70"
                       title="Edit vacancy"
                     >
                       <Edit2 className="w-4 h-4" />
@@ -619,12 +647,21 @@ export default function VacanciesTab({ profileId, readOnly = false, triggerCreat
                     </button>
                     <button
                       onClick={() => handleDuplicate(vacancy)}
-                      disabled={actionLoading === vacancy.id}
-                      className="flex-1 flex items-center justify-center gap-2 px-4 py-2.5 text-sm font-medium text-gray-700 bg-white border border-gray-300 hover:bg-gray-50 hover:border-gray-400 rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                      disabled={Boolean(actionLoading)}
+                      className="flex-1 flex items-center justify-center gap-2 px-4 py-2.5 text-sm font-medium text-gray-700 bg-white border border-gray-300 hover:bg-gray-50 hover:border-gray-400 rounded-lg transition-colors disabled:cursor-not-allowed disabled:opacity-70"
                       title="Duplicate vacancy"
                     >
-                      <Copy className="w-4 h-4" />
-                      {actionLoading === vacancy.id && vacancy.status !== 'draft' ? 'Duplicating...' : 'Duplicate'}
+                      {actionLoading?.id === vacancy.id && actionLoading.action === 'duplicate' ? (
+                        <span className="flex items-center gap-2">
+                          <Loader2 className="h-4 w-4 animate-spin" />
+                          Duplicating...
+                        </span>
+                      ) : (
+                        <span className="flex items-center gap-2">
+                          <Copy className="h-4 w-4" />
+                          Duplicate
+                        </span>
+                      )}
                     </button>
                   </div>
                 </div>
@@ -702,7 +739,7 @@ export default function VacanciesTab({ profileId, readOnly = false, triggerCreat
           }}
           onConfirm={handlePublish}
           vacancyTitle={vacancyToPublish.title}
-          isLoading={actionLoading === vacancyToPublish.id}
+          isLoading={actionLoading?.id === vacancyToPublish.id && actionLoading.action === 'publish'}
         />
       )}
 
@@ -716,7 +753,7 @@ export default function VacanciesTab({ profileId, readOnly = false, triggerCreat
           }}
           onConfirm={handleDelete}
           vacancyTitle={vacancyToDelete.title}
-          isLoading={actionLoading === vacancyToDelete.id}
+          isLoading={actionLoading?.id === vacancyToDelete.id && actionLoading.action === 'delete'}
         />
       )}
     </div>
