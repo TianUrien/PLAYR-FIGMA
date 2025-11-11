@@ -27,31 +27,33 @@ const BENEFIT_OPTIONS = [
   { id: 'equipment', label: 'Equipment', icon: Trophy },
 ]
 
+const buildInitialFormData = (vacancy?: Vacancy | null): Partial<VacancyInsert> => ({
+  opportunity_type: vacancy?.opportunity_type || 'player',
+  title: vacancy?.title || '',
+  position: vacancy?.position || undefined,
+  gender: vacancy?.gender || undefined,
+  description: vacancy?.description || '',
+  location_city: vacancy?.location_city || '',
+  location_country: vacancy?.location_country || '',
+  start_date: vacancy?.start_date || null,
+  duration_text: vacancy?.duration_text || '',
+  requirements: vacancy?.requirements || [],
+  benefits: vacancy?.benefits || [],
+  custom_benefits: vacancy?.custom_benefits || [],
+  priority: vacancy?.priority || 'medium',
+  status: vacancy?.status || 'draft',
+  application_deadline: vacancy?.application_deadline || null,
+  contact_email: vacancy?.contact_email || '',
+  contact_phone: vacancy?.contact_phone || '',
+})
+
 export default function CreateVacancyModal({ isOpen, onClose, onSuccess, editingVacancy }: CreateVacancyModalProps) {
   const { user } = useAuthStore()
   const [isLoading, setIsLoading] = useState(false)
   const [errors, setErrors] = useState<Record<string, string>>({})
   const { addToast } = useToastStore()
 
-  const [formData, setFormData] = useState<Partial<VacancyInsert>>({
-    opportunity_type: editingVacancy?.opportunity_type || 'player',
-    title: editingVacancy?.title || '',
-    position: editingVacancy?.position || undefined,
-    gender: editingVacancy?.gender || undefined,
-    description: editingVacancy?.description || '',
-    location_city: editingVacancy?.location_city || '',
-    location_country: editingVacancy?.location_country || '',
-    start_date: editingVacancy?.start_date || null,
-    duration_text: editingVacancy?.duration_text || '',
-    requirements: editingVacancy?.requirements || [],
-    benefits: editingVacancy?.benefits || [],
-    custom_benefits: editingVacancy?.custom_benefits || [],
-    priority: editingVacancy?.priority || 'medium',
-    status: editingVacancy?.status || 'draft',
-    application_deadline: editingVacancy?.application_deadline || null,
-    contact_email: editingVacancy?.contact_email || '',
-    contact_phone: editingVacancy?.contact_phone || '',
-  })
+  const [formData, setFormData] = useState<Partial<VacancyInsert>>(buildInitialFormData(editingVacancy))
 
   const [newRequirement, setNewRequirement] = useState('')
   const [newCustomBenefit, setNewCustomBenefit] = useState('')
@@ -82,6 +84,15 @@ export default function CreateVacancyModal({ isOpen, onClose, onSuccess, editing
   }, [isLoading, onClose])
 
   useFocusTrap({ containerRef: dialogRef, isActive: isOpen, initialFocusRef: opportunityTypeRef })
+
+  useEffect(() => {
+    if (isOpen) {
+      setFormData(buildInitialFormData(editingVacancy))
+      setErrors({})
+      setNewRequirement('')
+      setNewCustomBenefit('')
+    }
+  }, [editingVacancy, isOpen])
 
   useEffect(() => {
     if (!isOpen) {
