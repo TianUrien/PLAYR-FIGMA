@@ -34,22 +34,22 @@ export default function ApplicantCard({ application }: ApplicantCardProps) {
   }
 
   return (
-    <div className="bg-white border border-gray-200 rounded-xl p-6 hover:shadow-md transition-shadow">
-      <div className="flex items-center gap-4">
+    <div className="rounded-xl border border-gray-200 bg-white p-4 shadow-sm transition-shadow hover:shadow-md sm:p-6">
+      <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:gap-6">
         {/* Player Photo */}
         <button
           onClick={handleViewProfile}
-          className="flex-shrink-0 cursor-pointer group"
+          className="group flex-shrink-0 cursor-pointer"
         >
           {player.avatar_url ? (
             <img
               src={player.avatar_url}
               alt={displayName}
-              className="w-16 h-16 rounded-full object-cover ring-2 ring-gray-200 group-hover:ring-blue-500 transition-all"
+              className="h-14 w-14 rounded-full object-cover ring-2 ring-gray-200 transition-all group-hover:ring-blue-500 sm:h-16 sm:w-16"
             />
           ) : (
-            <div className="w-16 h-16 rounded-full bg-gradient-to-br from-blue-500 to-purple-600 flex items-center justify-center ring-2 ring-gray-200 group-hover:ring-blue-500 transition-all">
-              <span className="text-white font-bold text-lg">
+            <div className="flex h-14 w-14 items-center justify-center rounded-full bg-gradient-to-br from-blue-500 to-purple-600 ring-2 ring-gray-200 transition-all group-hover:ring-blue-500 sm:h-16 sm:w-16">
+              <span className="text-base font-bold text-white sm:text-lg">
                 {getInitials(displayName)}
               </span>
             </div>
@@ -57,28 +57,28 @@ export default function ApplicantCard({ application }: ApplicantCardProps) {
         </button>
 
         {/* Player Info */}
-        <div className="flex-1 min-w-0">
+        <div className="min-w-0 flex-1">
           <button
             onClick={handleViewProfile}
             className="text-left group"
           >
-            <h3 className="text-lg font-bold text-gray-900 group-hover:text-blue-600 transition-colors">
+            <h3 className="text-base font-semibold text-gray-900 transition-colors group-hover:text-blue-600 sm:text-lg">
               {displayName}
             </h3>
           </button>
           
-          <div className="flex items-center gap-3 mt-1 text-sm text-gray-600">
+          <div className="mt-1 flex flex-wrap items-center gap-2 text-xs text-gray-600 sm:text-sm">
             {player.position ? <span className="font-medium">{player.position}</span> : null}
             {player.position && player.base_location ? <span>•</span> : null}
             {player.base_location ? (
               <div className="flex items-center gap-1">
-                <MapPin className="w-3.5 h-3.5" />
+                <MapPin className="h-3 w-3 sm:h-3.5 sm:w-3.5" />
                 <span>{player.base_location}</span>
               </div>
             ) : null}
           </div>
 
-          <div className="mt-2 text-xs text-gray-500">
+          <div className="mt-2 text-xs text-gray-500 sm:text-sm">
             Applied {formatDate(application.applied_at)}
           </div>
         </div>
@@ -86,7 +86,7 @@ export default function ApplicantCard({ application }: ApplicantCardProps) {
         {/* View Profile Button */}
         <button
           onClick={handleViewProfile}
-          className="flex-shrink-0 px-6 py-2.5 text-sm font-medium text-blue-700 bg-white border border-blue-200 hover:bg-blue-50 rounded-lg transition-colors"
+          className="inline-flex w-full items-center justify-center rounded-lg border border-blue-200 px-4 py-2 text-sm font-medium text-blue-700 transition-colors hover:bg-blue-50 sm:w-auto sm:px-6 sm:py-2.5"
         >
           View Profile
         </button>

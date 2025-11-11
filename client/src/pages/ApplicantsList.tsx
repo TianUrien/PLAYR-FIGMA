@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
-import { ArrowLeft } from 'lucide-react'
+import { ArrowLeft, Users } from 'lucide-react'
 import { supabase } from '@/lib/supabase'
 import { useAuthStore } from '@/lib/auth'
 import type { VacancyApplicationWithPlayer, Vacancy, Json } from '@/lib/supabase'
@@ -147,37 +147,38 @@ export default function ApplicantsList() {
   }
 
   return (
-    <div className="min-h-screen bg-gray-50">
+    <div className="min-h-screen bg-gray-50 pb-16">
       {/* Header */}
-      <div className="bg-white border-b border-gray-200">
-        <div className="max-w-5xl mx-auto px-6 py-8">
-          {/* Back Button */}
+      <div className="bg-white/95 backdrop-blur border-b border-gray-100">
+        <div className="mx-auto flex w-full max-w-4xl flex-col gap-6 px-4 py-6 sm:px-6">
           <button
-            onClick={() => navigate('/dashboard/profile')}
-            className="inline-flex items-center gap-2 text-sm text-gray-600 hover:text-gray-900 mb-6 transition-colors"
+            onClick={() => navigate(-1)}
+            className="inline-flex w-fit items-center gap-2 text-sm font-medium text-gray-600 transition-colors hover:text-gray-900"
           >
-            <ArrowLeft className="w-4 h-4" />
+            <ArrowLeft className="h-4 w-4" />
             Back to Vacancies
           </button>
 
-          {/* Title */}
-          <h1 className="text-3xl font-bold text-gray-900 mb-2">
-            Applicants for {vacancy.title}
-          </h1>
-          <p className="text-gray-600">
-            {applications.length} applicant{applications.length !== 1 ? 's' : ''}
-          </p>
+          <div>
+            <h1 className="text-2xl font-bold text-gray-900 sm:text-3xl">
+              Applicants for {vacancy.title}
+            </h1>
+            <p className="mt-2 flex items-center gap-2 text-sm text-gray-600">
+              <Users className="h-4 w-4" />
+              {applications.length} applicant{applications.length !== 1 ? 's' : ''}
+            </p>
+          </div>
         </div>
       </div>
 
       {/* Content */}
-      <div className="max-w-5xl mx-auto px-6 py-8">
+      <div className="mx-auto w-full max-w-4xl px-4 py-6 sm:px-6 sm:py-8">
         {applications.length === 0 ? (
-          <div className="bg-white border border-gray-200 rounded-xl p-12 text-center">
-            <div className="text-6xl mb-4">📭</div>
-            <h3 className="text-xl font-semibold text-gray-900 mb-2">No Applicants Yet</h3>
-            <p className="text-gray-600">
-              Applications will appear here once players start applying to this vacancy.
+          <div className="rounded-2xl border border-gray-200 bg-white p-10 text-center">
+            <div className="mb-4 text-5xl">📭</div>
+            <h3 className="mb-2 text-lg font-semibold text-gray-900 sm:text-xl">No Applicants Yet</h3>
+            <p className="text-sm text-gray-600 sm:text-base">
+              Applications will appear here once players start applying to this opportunity.
             </p>
           </div>
         ) : (
