@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { MapPin, Globe, Calendar, Plus, Eye, MessageCircle, Edit } from 'lucide-react'
+import { MapPin, Globe, Calendar, Plus, Eye, MessageCircle, Edit, Loader2 } from 'lucide-react'
 import { useAuthStore } from '@/lib/auth'
 import { Avatar, EditProfileModal } from '@/components'
 import Header from '@/components/Header'
@@ -9,6 +9,7 @@ import type { Profile } from '@/lib/supabase'
 import { supabase } from '@/lib/supabase'
 import { useNavigate } from 'react-router-dom'
 import { useToastStore } from '@/lib/toast'
+import Skeleton from '@/components/Skeleton'
 
 type TabType = 'overview' | 'media' | 'vacancies' | 'players'
 
@@ -27,7 +28,6 @@ export default function ClubDashboard({ profileData, readOnly = false }: ClubDas
   const [sendingMessage, setSendingMessage] = useState(false)
   const [triggerCreateVacancy, setTriggerCreateVacancy] = useState(false)
 
-  if (!profile) return null
 
   const handleCreateVacancyClick = () => {
     // Switch to vacancies tab
@@ -99,6 +99,48 @@ export default function ClubDashboard({ profileData, readOnly = false }: ClubDas
       .slice(0, 2)  // Limit to 2 characters
   }
 
+  if (!profile) {
+    return (
+      <div className="min-h-screen bg-gray-50">
+        <Header />
+
+        <main className="mx-auto max-w-7xl px-4 pt-24 pb-12 md:px-6">
+          <div className="mb-6 rounded-2xl bg-white p-6 shadow-sm md:p-8">
+            <div className="flex flex-col gap-6 md:flex-row md:items-center">
+              <Skeleton variant="circular" width={96} height={96} className="flex-shrink-0" />
+              <div className="flex-1 space-y-4">
+                <Skeleton width="60%" height={40} />
+                <div className="flex flex-wrap gap-4">
+                  <Skeleton width={160} height={24} />
+                  <Skeleton width={140} height={24} />
+                  <Skeleton width={120} height={24} />
+                </div>
+                <Skeleton width={90} height={28} className="rounded-full" />
+              </div>
+            </div>
+          </div>
+
+          <div className="rounded-2xl bg-white shadow-sm">
+            <div className="sticky top-[68px] z-40 border-b border-gray-200 bg-white/90 backdrop-blur">
+              <div className="flex gap-6 overflow-x-auto px-6 py-4">
+                {tabs.map(tab => (
+                  <div key={tab.id} className="flex flex-col items-start space-y-2">
+                    <Skeleton width={80} height={24} />
+                  </div>
+                ))}
+              </div>
+            </div>
+            <div className="space-y-6 p-6 md:p-8">
+              <Skeleton width="40%" height={28} />
+              <Skeleton width="100%" height={120} />
+              <Skeleton width="100%" height={120} />
+            </div>
+          </div>
+        </main>
+      </div>
+    )
+  }
+
   return (
     <div className="min-h-screen bg-gray-50">
       <Header />
@@ -132,8 +174,12 @@ export default function ClubDashboard({ profileData, readOnly = false }: ClubDas
                       disabled={sendingMessage}
                       className="inline-flex items-center gap-2 px-4 py-2 bg-gradient-to-br from-[#6366f1] to-[#8b5cf6] text-white rounded-lg hover:shadow-lg transition-all text-sm font-medium disabled:opacity-50"
                     >
-                      <MessageCircle className="w-4 h-4" />
-                      Message
+                      {sendingMessage ? (
+                        <Loader2 className="w-4 h-4 animate-spin" />
+                      ) : (
+                        <MessageCircle className="w-4 h-4" />
+                      )}
+                      {sendingMessage ? 'Starting...' : 'Message'}
                     </button>
                   </div>
                 ) : (
@@ -175,8 +221,8 @@ export default function ClubDashboard({ profileData, readOnly = false }: ClubDas
         {/* Tabs Card */}
         <div className="bg-white rounded-2xl shadow-sm animate-slide-in-up">
           {/* Tab Navigation */}
-          <div className="border-b border-gray-200 overflow-x-auto">
-            <nav className="flex gap-8 px-6 min-w-max">
+          <div className="sticky top-[68px] z-40 border-b border-gray-200 bg-white/90 backdrop-blur">
+            <nav className="flex min-w-max gap-8 px-6 overflow-x-auto">
               {tabs.map(tab => (
                 <button
                   key={tab.id}

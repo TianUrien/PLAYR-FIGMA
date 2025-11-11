@@ -436,7 +436,10 @@ export default function MediaTab({ profileId, readOnly = false }: MediaTabProps)
         icon={<Video className="h-6 w-6" />}
       />
 
-      <MediaLightbox photo={previewPhoto} onClose={() => setPreviewPhoto(null)} />
+      <MediaLightbox
+        media={previewPhoto ? { id: previewPhoto.id, url: previewPhoto.photo_url } : null}
+        onClose={() => setPreviewPhoto(null)}
+      />
     </div>
   )
 }

@@ -1,9 +1,12 @@
 import { useState, useEffect, useRef, useCallback } from 'react'
-import { Upload, Trash2, GripVertical, Edit2, X, Check } from 'lucide-react'
+import { Upload, Trash2, GripVertical, Edit2, X, Check, ArrowUp, ArrowDown, Loader2 } from 'lucide-react'
 import { supabase } from '@/lib/supabase'
 import { useAuthStore } from '@/lib/auth'
 import { useToastStore } from '@/lib/toast'
 import type { ClubMedia } from '@/lib/supabase'
+import ConfirmActionModal from './ConfirmActionModal'
+import MediaLightbox from './MediaLightbox'
+import Skeleton from './Skeleton'
 
 interface ClubMediaTabProps {
   clubId?: string
@@ -30,6 +33,11 @@ export default function ClubMediaTab({ clubId, readOnly = false }: ClubMediaTabP
   const [editingCaption, setEditingCaption] = useState<string | null>(null)
   const [captionText, setCaptionText] = useState('')
   const [altText, setAltText] = useState('')
+  const [pendingDelete, setPendingDelete] = useState<ClubMedia | null>(null)
+  const [deletingId, setDeletingId] = useState<string | null>(null)
+  const [previewMedia, setPreviewMedia] = useState<ClubMedia | null>(null)
+  const [isUploadDragActive, setIsUploadDragActive] = useState(false)
+  const [savingCaptionId, setSavingCaptionId] = useState<string | null>(null)
 
   // Fetch club media
   const fetchMedia = useCallback(async () => {
@@ -171,36 +179,40 @@ export default function ClubMediaTab({ clubId, readOnly = false }: ClubMediaTabP
     }
   }
 
-  // Handle delete
-  const handleDelete = async (mediaItem: ClubMedia) => {
-    if (!confirm('Are you sure you want to delete this photo?')) return
+  const requestDelete = (mediaItem: ClubMedia) => {
+    setPendingDelete(mediaItem)
+  }
 
+  const confirmDelete = async () => {
+    if (!pendingDelete) return
+
+    setDeletingId(pendingDelete.id)
     try {
-      // Extract file path from URL
-      const urlParts = mediaItem.file_url.split('/club-media/')
+      const urlParts = pendingDelete.file_url.split('/club-media/')
       if (urlParts.length < 2) throw new Error('Invalid file URL')
       const filePath = urlParts[1]
 
-      // Delete from storage
       const { error: storageError } = await supabase.storage
         .from('club-media')
         .remove([filePath])
 
       if (storageError) throw storageError
 
-      // Delete from database
       const { error: dbError } = await supabase
         .from('club_media')
         .delete()
-        .eq('id', mediaItem.id)
+        .eq('id', pendingDelete.id)
 
       if (dbError) throw dbError
 
-      // Refresh media list
       await fetchMedia()
+      addToast('Photo removed from gallery.', 'success')
+      setPendingDelete(null)
     } catch (error) {
       console.error('Error deleting media:', error)
       addToast('Failed to delete photo. Please try again.', 'error')
+    } finally {
+      setDeletingId(null)
     }
   }
 
@@ -210,16 +222,37 @@ export default function ClubMediaTab({ clubId, readOnly = false }: ClubMediaTabP
     e.dataTransfer.effectAllowed = 'move'
   }
 
-  // Handle drag over
-  const handleDragOver = (e: React.DragEvent) => {
+  const handleReorderDragOver = (e: React.DragEvent) => {
     e.preventDefault()
     e.dataTransfer.dropEffect = 'move'
   }
 
-  // Handle drop
-  const handleDrop = async (e: React.DragEvent, targetItem: ClubMedia) => {
+  const persistOrder = async (updatedList: ClubMedia[]) => {
+    const normalized = updatedList.map((item, index) => ({
+      ...item,
+      order_index: index
+    }))
+
+    setMedia(normalized)
+
+    try {
+      await Promise.all(
+        normalized.map(item =>
+          supabase
+            .from('club_media')
+            .update({ order_index: item.order_index })
+            .eq('id', item.id)
+        )
+      )
+    } catch (error) {
+      console.error('Error updating order:', error)
+      await fetchMedia()
+    }
+  }
+
+  const handleDrop = (e: React.DragEvent, targetItem: ClubMedia) => {
     e.preventDefault()
-    
+
     if (!draggedItem || draggedItem.id === targetItem.id) {
       setDraggedItem(null)
       return
@@ -229,36 +262,25 @@ export default function ClubMediaTab({ clubId, readOnly = false }: ClubMediaTabP
     const draggedIndex = reorderedMedia.findIndex(m => m.id === draggedItem.id)
     const targetIndex = reorderedMedia.findIndex(m => m.id === targetItem.id)
 
-    // Remove dragged item and insert at target position
     const [removed] = reorderedMedia.splice(draggedIndex, 1)
     reorderedMedia.splice(targetIndex, 0, removed)
 
-    // Update order_index for all items
-    const updates = reorderedMedia.map((item, index) => ({
-      id: item.id,
-      order_index: index
-    }))
-
-    // Optimistically update UI
-    setMedia(reorderedMedia.map((item, index) => ({
-      ...item,
-      order_index: index
-    })))
     setDraggedItem(null)
+    void persistOrder(reorderedMedia)
+  }
 
-    // Update database
-    try {
-      for (const update of updates) {
-        await supabase
-          .from('club_media')
-          .update({ order_index: update.order_index })
-          .eq('id', update.id)
-      }
-    } catch (error) {
-      console.error('Error updating order:', error)
-      // Revert on error
-      await fetchMedia()
-    }
+  const moveMedia = (itemId: string, direction: 'up' | 'down') => {
+    const currentIndex = media.findIndex(item => item.id === itemId)
+    if (currentIndex === -1) return
+
+    const targetIndex = direction === 'up' ? currentIndex - 1 : currentIndex + 1
+    if (targetIndex < 0 || targetIndex >= media.length) return
+
+    const reordered = [...media]
+    const [item] = reordered.splice(currentIndex, 1)
+    reordered.splice(targetIndex, 0, item)
+
+    void persistOrder(reordered)
   }
 
   // Handle caption edit
@@ -269,6 +291,7 @@ export default function ClubMediaTab({ clubId, readOnly = false }: ClubMediaTabP
   }
 
   const saveCaption = async (itemId: string) => {
+    setSavingCaptionId(itemId)
     try {
       const { error } = await supabase
         .from('club_media')
@@ -286,6 +309,8 @@ export default function ClubMediaTab({ clubId, readOnly = false }: ClubMediaTabP
     } catch (error) {
       console.error('Error updating caption:', error)
       addToast('Failed to update caption. Please try again.', 'error')
+    } finally {
+      setSavingCaptionId(null)
     }
   }
 
@@ -296,19 +321,33 @@ export default function ClubMediaTab({ clubId, readOnly = false }: ClubMediaTabP
   }
 
   // Handle drag and drop zone
-  const handleDragEnter = (e: React.DragEvent) => {
+  const handleUploadDragEnter = (e: React.DragEvent) => {
     e.preventDefault()
     e.stopPropagation()
+    setIsUploadDragActive(true)
   }
 
-  const handleDragLeave = (e: React.DragEvent) => {
+  const handleUploadDragLeave = (e: React.DragEvent) => {
     e.preventDefault()
     e.stopPropagation()
+    const related = e.relatedTarget as Node | null
+    if (related && e.currentTarget.contains(related)) {
+      return
+    }
+    setIsUploadDragActive(false)
   }
 
-  const handleDropZone = (e: React.DragEvent) => {
+  const handleUploadDragOver = (e: React.DragEvent) => {
     e.preventDefault()
     e.stopPropagation()
+    e.dataTransfer.dropEffect = 'copy'
+    setIsUploadDragActive(true)
+  }
+
+  const handleUploadDrop = (e: React.DragEvent) => {
+    e.preventDefault()
+    e.stopPropagation()
+    setIsUploadDragActive(false)
     
     const files = e.dataTransfer.files
     handleFileUpload(files)
@@ -318,16 +357,19 @@ export default function ClubMediaTab({ clubId, readOnly = false }: ClubMediaTabP
     <div className="space-y-6">
       {/* Header */}
       {!readOnly && (
-        <div className="flex items-center justify-between">
+        <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
           <div>
             <h2 className="text-2xl font-bold text-gray-900">Photo Gallery</h2>
-            <p className="text-gray-600 mt-1">Upload and manage your club photos</p>
+            <p className="mt-1 text-gray-600 sm:mt-0 sm:text-sm">
+              Upload and manage your club photos
+            </p>
           </div>
           <button
             onClick={() => fileInputRef.current?.click()}
-            className="inline-flex items-center gap-2 px-6 py-3 bg-gradient-to-r from-[#6366f1] to-[#8b5cf6] text-white rounded-lg hover:opacity-90 transition-opacity font-medium"
+            className="inline-flex w-full items-center justify-center gap-2 rounded-lg bg-gradient-to-r from-[#6366f1] to-[#8b5cf6] px-6 py-3 font-medium text-white transition-opacity hover:opacity-90 sm:w-auto"
+            type="button"
           >
-            <Upload className="w-5 h-5" />
+            <Upload className="h-5 w-5" />
             Add Photos
           </button>
           <input
@@ -376,15 +418,27 @@ export default function ClubMediaTab({ clubId, readOnly = false }: ClubMediaTabP
       {/* Drag & Drop Upload Zone */}
       {!readOnly && media.length === 0 && !isLoading && (
         <div
-          onDragEnter={handleDragEnter}
-          onDragOver={handleDragOver}
-          onDragLeave={handleDragLeave}
-          onDrop={handleDropZone}
-          className="border-2 border-dashed border-gray-300 rounded-xl p-12 text-center hover:border-purple-400 transition-colors cursor-pointer"
+          onDragEnter={handleUploadDragEnter}
+          onDragOver={handleUploadDragOver}
+          onDragLeave={handleUploadDragLeave}
+          onDrop={handleUploadDrop}
+          className={`cursor-pointer rounded-xl border-2 border-dashed p-12 text-center transition-colors ${
+            isUploadDragActive
+              ? 'border-[#8b5cf6] bg-[#f5f3ff]'
+              : 'border-gray-300 hover:border-[#8b5cf6]'
+          }`}
           onClick={() => fileInputRef.current?.click()}
+          onKeyDown={(event) => {
+            if (event.key === 'Enter' || event.key === ' ') {
+              event.preventDefault()
+              fileInputRef.current?.click()
+            }
+          }}
+          role="button"
+          tabIndex={0}
         >
-          <Upload className="w-12 h-12 text-gray-400 mx-auto mb-4" />
-          <p className="text-gray-600 font-medium mb-1">
+          <Upload className="mx-auto mb-4 h-12 w-12 text-gray-400" />
+          <p className="mb-1 font-medium text-gray-600">
             Drag and drop photos here, or click to browse
           </p>
           <p className="text-sm text-gray-500">
@@ -395,48 +449,66 @@ export default function ClubMediaTab({ clubId, readOnly = false }: ClubMediaTabP
 
       {/* Loading State */}
       {isLoading && (
-        <div className="flex items-center justify-center py-12">
-          <div className="w-8 h-8 border-4 border-purple-500 border-t-transparent rounded-full animate-spin" />
+        <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-4">
+          {Array.from({ length: 6 }).map((_, index) => (
+            <Skeleton key={index} className="aspect-[3/4] w-full" variant="rectangular" />
+          ))}
         </div>
       )}
 
       {/* Photo Grid */}
       {!isLoading && media.length > 0 && (
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
-          {media.map((item) => (
+        <div className="grid grid-cols-2 gap-4 sm:grid-cols-3 lg:grid-cols-4">
+          {media.map((item, index) => (
             <div
               key={item.id}
               draggable={!readOnly}
               onDragStart={(e) => handleDragStart(e, item)}
-              onDragOver={handleDragOver}
+              onDragOver={handleReorderDragOver}
               onDrop={(e) => handleDrop(e, item)}
-              className={`bg-white border border-gray-200 rounded-xl overflow-hidden hover:shadow-lg transition-shadow ${
-                !readOnly ? 'cursor-move' : ''
+              className={`group rounded-xl border border-gray-200 bg-white transition-shadow hover:shadow-lg ${
+                !readOnly ? 'cursor-move active:cursor-grabbing' : ''
               }`}
             >
               {/* Image */}
-              <div className="relative aspect-square bg-gray-100">
+              <div
+                className="relative aspect-[3/4] overflow-hidden bg-gray-100"
+                role="button"
+                tabIndex={0}
+                onClick={() => setPreviewMedia(item)}
+                onKeyDown={(event) => {
+                  if (event.key === 'Enter' || event.key === ' ') {
+                    event.preventDefault()
+                    setPreviewMedia(item)
+                  }
+                }}
+              >
                 <img
                   src={item.file_url}
                   alt={item.alt_text || item.file_name}
-                  className="w-full h-full object-cover"
+                  className="h-full w-full object-cover transition-transform duration-300 group-hover:scale-105"
                   loading="lazy"
                 />
                 {!readOnly && (
-                  <div className="absolute top-2 right-2 flex gap-2">
-                    <button
-                      onClick={() => handleDelete(item)}
-                      className="p-2 bg-red-500 text-white rounded-lg hover:bg-red-600 transition-colors shadow-lg"
-                      title="Delete photo"
-                    >
-                      <Trash2 className="w-4 h-4" />
-                    </button>
+                  <div className="pointer-events-none absolute left-2 top-2 rounded-lg bg-white/80 p-2 shadow-lg backdrop-blur">
+                    <GripVertical className="w-4 h-4 text-gray-600" />
                   </div>
                 )}
                 {!readOnly && (
-                  <div className="absolute top-2 left-2 p-2 bg-white/80 backdrop-blur rounded-lg shadow-lg">
-                    <GripVertical className="w-4 h-4 text-gray-600" />
-                  </div>
+                  <button
+                    data-block-preview
+                    onClick={(event) => {
+                      event.stopPropagation()
+                      requestDelete(item)
+                    }}
+                    onKeyDown={(event) => event.stopPropagation()}
+                    disabled={deletingId === item.id}
+                    className="absolute right-2 top-2 rounded-lg bg-red-500 p-2 text-white shadow-lg transition-colors hover:bg-red-600 focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:ring-red-600 disabled:cursor-not-allowed disabled:opacity-50"
+                    title="Delete photo"
+                    type="button"
+                  >
+                    <Trash2 className="h-4 w-4" />
+                  </button>
                 )}
               </div>
 
@@ -456,35 +528,71 @@ export default function ClubMediaTab({ clubId, readOnly = false }: ClubMediaTabP
                       value={altText}
                       onChange={(e) => setAltText(e.target.value)}
                       placeholder="Alt text for accessibility (optional)"
-                      className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-purple-500 text-sm"
+                      className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-purple-500"
                     />
-                    <div className="flex gap-2">
+                    <div className="flex flex-col gap-2 sm:flex-row sm:justify-end">
                       <button
                         onClick={() => saveCaption(item.id)}
-                        className="flex-1 px-3 py-2 bg-green-500 text-white rounded-lg hover:bg-green-600 transition-colors text-sm font-medium flex items-center justify-center gap-1"
+                        className="flex-1 rounded-lg bg-green-500 px-3 py-2 text-sm font-medium text-white transition-colors hover:bg-green-600 disabled:cursor-not-allowed disabled:bg-green-400 sm:flex-none sm:min-w-[120px]"
+                        disabled={savingCaptionId === item.id}
+                        type="button"
                       >
-                        <Check className="w-4 h-4" />
-                        Save
+                        {savingCaptionId === item.id ? (
+                          <span className="flex items-center justify-center gap-2">
+                            <Loader2 className="h-4 w-4 animate-spin" />
+                            Saving…
+                          </span>
+                        ) : (
+                          <span className="flex items-center justify-center gap-1">
+                            <Check className="h-4 w-4" />
+                            Save
+                          </span>
+                        )}
                       </button>
                       <button
                         onClick={cancelEdit}
-                        className="flex-1 px-3 py-2 bg-gray-200 text-gray-700 rounded-lg hover:bg-gray-300 transition-colors text-sm font-medium flex items-center justify-center gap-1"
+                        className="flex-1 rounded-lg border border-[#8b5cf6] px-3 py-2 text-sm font-medium text-[#8b5cf6] transition-colors hover:bg-[#f5f3ff] disabled:cursor-not-allowed disabled:opacity-60 sm:flex-none sm:min-w-[120px]"
+                        disabled={savingCaptionId === item.id}
+                        type="button"
                       >
-                        <X className="w-4 h-4" />
-                        Cancel
+                        <span className="flex items-center justify-center gap-1">
+                          <X className="h-4 w-4" />
+                          Cancel
+                        </span>
                       </button>
                     </div>
                   </div>
                 ) : (
                   <>
                     {!readOnly && (
-                      <div className="flex justify-end mb-2">
+                      <div className="mb-2 flex items-center justify-between gap-2">
+                        <div className="inline-flex overflow-hidden rounded-lg border border-gray-200 bg-white">
+                          <button
+                            onClick={() => moveMedia(item.id, 'up')}
+                            className="px-2 py-1 text-gray-500 transition-colors hover:bg-gray-100 focus:outline-none focus-visible:ring-2 focus-visible:ring-[#8b5cf6] focus-visible:ring-offset-1 disabled:cursor-not-allowed disabled:opacity-40 disabled:hover:bg-transparent"
+                            disabled={index === 0}
+                            type="button"
+                          >
+                            <ArrowUp className="h-4 w-4" />
+                            <span className="sr-only">Move photo earlier</span>
+                          </button>
+                          <button
+                            onClick={() => moveMedia(item.id, 'down')}
+                            className="px-2 py-1 text-gray-500 transition-colors hover:bg-gray-100 focus:outline-none focus-visible:ring-2 focus-visible:ring-[#8b5cf6] focus-visible:ring-offset-1 disabled:cursor-not-allowed disabled:opacity-40 disabled:hover:bg-transparent"
+                            disabled={index === media.length - 1}
+                            type="button"
+                          >
+                            <ArrowDown className="h-4 w-4" />
+                            <span className="sr-only">Move photo later</span>
+                          </button>
+                        </div>
                         <button
                           onClick={() => startEditingCaption(item)}
-                          className="p-1 text-gray-400 hover:text-purple-600 transition-colors"
+                          className="p-1 text-gray-400 transition-colors hover:text-purple-600"
                           title="Edit caption"
+                          type="button"
                         >
-                          <Edit2 className="w-4 h-4" />
+                          <Edit2 className="h-4 w-4" />
                         </button>
                       </div>
                     )}
@@ -501,6 +609,27 @@ export default function ClubMediaTab({ clubId, readOnly = false }: ClubMediaTabP
               </div>
             </div>
           ))}
+          {!readOnly && (
+            <button
+              type="button"
+              onClick={() => fileInputRef.current?.click()}
+              onDragEnter={handleUploadDragEnter}
+              onDragOver={handleUploadDragOver}
+              onDragLeave={handleUploadDragLeave}
+              onDrop={handleUploadDrop}
+              className={`flex aspect-[3/4] flex-col items-center justify-center gap-3 rounded-xl border-2 border-dashed text-center transition-colors ${
+                isUploadDragActive
+                  ? 'border-[#8b5cf6] bg-[#f5f3ff] text-[#8b5cf6]'
+                  : 'border-gray-300 text-gray-500 hover:border-[#8b5cf6]'
+              }`}
+            >
+              <Upload className="h-8 w-8" />
+              <span className="text-sm font-medium">Add more photos</span>
+              <span className="text-xs text-gray-400">
+                Drag files here or tap to browse
+              </span>
+            </button>
+          )}
         </div>
       )}
 
@@ -513,6 +642,39 @@ export default function ClubMediaTab({ clubId, readOnly = false }: ClubMediaTabP
           <p className="text-gray-600">No photos yet</p>
         </div>
       )}
+
+      <ConfirmActionModal
+        isOpen={Boolean(pendingDelete)}
+        onClose={() => setPendingDelete(null)}
+        onConfirm={confirmDelete}
+        confirmLabel="Delete Photo"
+        confirmTone="danger"
+        confirmLoading={Boolean(deletingId)}
+        loadingLabel="Deleting..."
+        title="Remove photo from gallery?"
+        description="This will permanently delete the image from your club media gallery."
+        icon={<Trash2 className="h-6 w-6" />}
+        body={pendingDelete ? (
+          <div className="space-y-3 text-sm text-gray-600">
+            <p>Deleting this media will also remove it from any public club marketing pages.</p>
+            <img
+              src={pendingDelete.file_url}
+              alt={pendingDelete.alt_text || pendingDelete.file_name}
+              className="h-48 w-full rounded-lg object-cover"
+              loading="lazy"
+            />
+          </div>
+        ) : undefined}
+      />
+
+      <MediaLightbox
+        media={previewMedia ? {
+          id: previewMedia.id,
+          url: previewMedia.file_url,
+          alt: previewMedia.alt_text || previewMedia.file_name
+        } : null}
+        onClose={() => setPreviewMedia(null)}
+      />
     </div>
   )
 }

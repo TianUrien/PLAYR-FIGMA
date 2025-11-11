@@ -1,20 +1,25 @@
 import { useEffect, useRef } from 'react'
 import { X } from 'lucide-react'
-import type { GalleryPhoto } from '@/lib/supabase'
 import { useFocusTrap } from '@/hooks/useFocusTrap'
 
+interface LightboxMedia {
+  id: string
+  url: string
+  alt?: string
+}
+
 interface MediaLightboxProps {
-  photo: GalleryPhoto | null
+  media: LightboxMedia | null
   onClose: () => void
 }
 
-export default function MediaLightbox({ photo, onClose }: MediaLightboxProps) {
+export default function MediaLightbox({ media, onClose }: MediaLightboxProps) {
   const dialogRef = useRef<HTMLDivElement>(null)
 
-  useFocusTrap({ containerRef: dialogRef, isActive: Boolean(photo) })
+  useFocusTrap({ containerRef: dialogRef, isActive: Boolean(media) })
 
   useEffect(() => {
-    if (!photo) return
+    if (!media) return
 
     const handleKeyDown = (event: KeyboardEvent) => {
       if (event.key === 'Escape') {
@@ -32,9 +37,9 @@ export default function MediaLightbox({ photo, onClose }: MediaLightboxProps) {
       document.removeEventListener('keydown', handleKeyDown)
       document.body.style.overflow = previousOverflow
     }
-  }, [photo, onClose])
+  }, [media, onClose])
 
-  if (!photo) return null
+  if (!media) return null
 
   return (
     <div className="fixed inset-0 z-[60] flex items-center justify-center bg-black/90 p-4" role="presentation" onClick={onClose}>
@@ -55,8 +60,8 @@ export default function MediaLightbox({ photo, onClose }: MediaLightboxProps) {
           <X className="h-5 w-5" />
         </button>
         <img
-          src={photo.photo_url}
-          alt="Gallery preview"
+          src={media.url}
+          alt={media.alt || 'Media preview'}
           className="h-full w-full rounded-xl object-contain"
         />
       </div>
