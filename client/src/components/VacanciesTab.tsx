@@ -11,6 +11,7 @@ import ApplyToVacancyModal from './ApplyToVacancyModal'
 import VacancyDetailView from './VacancyDetailView'
 import PublishConfirmationModal from './PublishConfirmationModal'
 import DeleteVacancyModal from './DeleteVacancyModal'
+import Skeleton, { VacancyCardSkeleton } from './Skeleton'
 
 interface VacanciesTabProps {
   profileId?: string
@@ -339,7 +340,29 @@ export default function VacanciesTab({ profileId, readOnly = false, triggerCreat
   }
 
   if (isLoading) {
-    return <div className="text-center py-12 text-gray-500">Loading vacancies...</div>
+    return (
+      <div className="space-y-6">
+        <div className="flex items-center justify-between">
+          <div className="space-y-3">
+            <div className="flex items-center gap-3">
+              <Skeleton variant="rectangular" width={48} height={48} className="rounded-lg" />
+              <div className="space-y-2">
+                <Skeleton width={180} height={20} />
+                <Skeleton width={260} height={16} />
+              </div>
+            </div>
+            <Skeleton width={140} height={14} />
+          </div>
+          {!readOnly && <Skeleton width={150} height={44} className="rounded-lg" />}
+        </div>
+
+        <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
+          {Array.from({ length: 2 }).map((_, index) => (
+            <VacancyCardSkeleton key={index} />
+          ))}
+        </div>
+      </div>
+    )
   }
 
   return (
@@ -378,24 +401,38 @@ export default function VacanciesTab({ profileId, readOnly = false, triggerCreat
       </div>
 
       {/* Empty State */}
-      {vacancies.length === 0 && (
-        <div className="border-2 border-dashed border-gray-300 rounded-xl p-12 text-center">
-          <div className="flex justify-center mb-4">
-            <div className="w-16 h-16 bg-green-100 rounded-full flex items-center justify-center">
+      {vacancies.length === 0 && !readOnly && (
+        <div className="rounded-xl border-2 border-dashed border-gray-300 p-12 text-center">
+          <div className="mb-4 flex justify-center">
+            <div className="flex h-16 w-16 items-center justify-center rounded-full bg-green-100">
               <span className="text-3xl">💼</span>
             </div>
           </div>
-          <h3 className="text-lg font-semibold text-gray-900 mb-2">No Vacancies Yet</h3>
-          <p className="text-gray-600 mb-6">
+          <h3 className="mb-2 text-lg font-semibold text-gray-900">No Vacancies Yet</h3>
+          <p className="mb-6 text-gray-600">
             Create your first vacancy to start attracting talent to your club
           </p>
           <Button
             onClick={handleCreateNew}
-            className="flex items-center gap-2 mx-auto bg-[#10b981] hover:bg-[#059669]"
+            className="mx-auto flex items-center gap-2 bg-[#10b981] hover:bg-[#059669]"
           >
-            <Plus className="w-4 h-4" />
+            <Plus className="h-4 w-4" />
             Create First Vacancy
           </Button>
+        </div>
+      )}
+
+      {vacancies.length === 0 && readOnly && (
+        <div className="rounded-xl border border-gray-200 bg-white p-10 text-center">
+          <div className="mb-4 flex justify-center">
+            <div className="flex h-14 w-14 items-center justify-center rounded-full bg-gray-100">
+              <span className="text-2xl">👀</span>
+            </div>
+          </div>
+          <h3 className="mb-2 text-lg font-semibold text-gray-900">No Open Opportunities</h3>
+          <p className="text-sm text-gray-600">
+            This club hasn’t posted any openings yet. Check back soon or follow them to stay updated.
+          </p>
         </div>
       )}
 
